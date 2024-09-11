@@ -7,7 +7,6 @@
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
-#include <iostream>
 
 #define BUFFER_SIZE 512
 
@@ -89,9 +88,9 @@ ssize_t readline(int fd, char *ptr, size_t maxlen) {
     return n;
 }
 
-std::string convertToString(char* a, int size) {
+char* convertToString(char* a, int size) {
     int i;
-    std::string s = "";
+    char* s = "";
     for (i = 0; i < size; i++) {
         s = s + a[i];
     }
@@ -113,7 +112,7 @@ int main(int argc, char* argv[]) {
     char* port = argv[2];
 
     int sock;
-    sockaddr_in serverAddr;
+    struct sockaddr_in serverAddr;
 
     sock = socket(AF_INET, SOCK_STREAM, 0);
     if (sock == -1) {
@@ -139,7 +138,7 @@ int main(int argc, char* argv[]) {
     char sendBuff[BUFFER_SIZE];
     char readBuff[BUFFER_SIZE];
 
-    while (true) {
+    while (1) {
         printf("Enter text to send to server: (Press Control-D to stop)\n");
 
         char* input = fgets(sendBuff, BUFFER_SIZE, stdin);
@@ -152,14 +151,10 @@ int main(int argc, char* argv[]) {
             //return 0;
         }
 
-        std::string message = convertToString(sendBuff, 1024);
-
-        int test = writen(sock, message.c_str(), message.size());
-        //send(sock, message.c_str(), message.size(), 0);
-        //recv(sock, buffer, sizeof(buffer), 0);
+        writen(sock, input, strlen(input));
         
-        readline(sock, readBuff, BUFFER_SIZE);
-        //readn(sock, buffer, message.size());
+        //readline(sock, readBuff, BUFFER_SIZE);
+        readn(sock, readBuff, strlen(input));
         //read(sock, buffer, BUFFER_SIZE);
 
         printf("Message from server: %s\n", readBuff);
