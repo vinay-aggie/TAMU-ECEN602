@@ -11,18 +11,18 @@ TARGET2 = echos
 all: $(TARGET1) $(TARGET2)
 
 # Link object files into the two executables.
-$(TARGET1): client.o
-	$(CC) $(CFLAGS) -o $(TARGET1) client.o
+$(TARGET1): client.o socketUtils.o
+	$(CC) $(CFLAGS) -o $(TARGET1) client.o socketUtils.o
 
-$(TARGET2): server.o
+$(TARGET2): server.o socketUtils.o
 	$(CC) $(CFLAGS) -o $(TARGET2) server.o
 
 # Compile the individual files but do not link.
-client.o: client.c socketUtils.o
-	$(CC) $(CFLAGS) -c socketUtils.o client.c
+client.o: client.c
+	$(CC) $(CFLAGS) -c client.c
 
-server.o: server.c socketUtils.o
-	$(CC) $(CFLAGS) -c socketUtils.o server.c
+server.o: server.c
+	$(CC) $(CFLAGS) -c server.c
 
 socketUtils.o: socketUtils.c socketUtils.h
 	$(CC) $(CFLAGS) -c socketUtils.c
