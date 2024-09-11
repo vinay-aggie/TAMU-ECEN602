@@ -10,6 +10,18 @@
 
 #define BUFFER_SIZE 512
 
+/*******************************************************
+ * writen function:
+ *      Writes data of fixed size to the socket establishing communication between client and server
+ * 
+ * Inputs:
+ *      int clientFd: socket connection between server and client
+ *      const char *ptrBuf: pointer to the buffer containing text to be sent through the socket
+ *      size_t bytesToWrite: size of the packet to send
+ * 
+ * Outputs:
+ *      int: Total number of bytes written to socket
+ ******************************************************/
 int writen(int clientFd, const char *ptrBuf, size_t bytesToWrite)
 {
     size_t bytesLeft;
@@ -40,6 +52,18 @@ int writen(int clientFd, const char *ptrBuf, size_t bytesToWrite)
     return (int)bytesWritten;
 }
 
+/* ******************************************************
+ * readline function:
+ *      Reads data of fixed size coming through socket
+ * 
+ * Inputs:
+ *      int fd: socket connection between server and client
+ *      const char *ptrBuf: pointer to the buffer to be filled with text sent through the socket
+ *      size_t bytesToRead: size of the packet that was sent
+ * 
+ * Outputs:
+ *      int: Total number of bytes read from the socket
+ ****************************************************** */
 int readline(int fd, char *ptrBuff, size_t bytesToRead) {
     int bytesLeft;
     int bytesRead;
@@ -63,41 +87,8 @@ int readline(int fd, char *ptrBuff, size_t bytesToRead) {
     return bytesToRead - bytesLeft;
 }
 
-/*ssize_t readline(int fd, char *ptr, size_t maxlen) {
-    ssize_t n, rc;
-    char c;
-
-    for (n = 1; n < maxlen; n++) {
-        again:
-            if ((rc = read(fd, &c, 1)) == 1) {
-                *ptr++ = c;
-                if (c == '\n')
-                    break;
-            } else if (rc == 0) {
-                *ptr = 0;
-                return (n - 1);
-            } else {
-                if (errno == EINTR) {
-                    goto again;
-                }
-                return -1;
-            }
-    }
-
-    *ptr = 0;
-    return n;
-}*/
-
-char* convertToString(char* a, int size) {
-    int i;
-    char* s = "";
-    for (i = 0; i < size; i++) {
-        s = s + a[i];
-    }
-    return s;
-}
-
 int main(int argc, char* argv[]) {
+    // Verify number of arguments is correct and notify user if not correct
     if (argc > 3) {
         printf("Too many arguments. Please only provide 3 arguments.\n");
         exit(EXIT_FAILURE);
@@ -114,6 +105,7 @@ int main(int argc, char* argv[]) {
     int sock;
     struct sockaddr_in serverAddr;
 
+    // Initialize socket and throw an error if failure
     sock = socket(AF_INET, SOCK_STREAM, 0);
     if (sock == -1) {
         printf("Failed to create a socket.\n{%s}\n", strerror(errno));
@@ -126,6 +118,7 @@ int main(int argc, char* argv[]) {
     serverAddr.sin_addr.s_addr = inet_addr(ip);
     serverAddr.sin_port = htons(atoi(port));
 
+    // Establish connection through the socket
     int connection = connect(sock, (struct sockaddr*)&serverAddr, sizeof(serverAddr));
 
     if (connection == -1) {
@@ -135,6 +128,7 @@ int main(int argc, char* argv[]) {
 
     printf("Successfully connected to server.\n");
 
+    // Define the buffers used to store data for sending and receiving respectively
     char sendBuff[BUFFER_SIZE];
     char readBuff[BUFFER_SIZE];
 
@@ -144,16 +138,18 @@ int main(int argc, char* argv[]) {
 
         printf("Enter text to send to server: (Press Control-D to stop)\n");
 
+        // Get user input and store in buffer before sending through socket
         char* input = fgets(sendBuff, BUFFER_SIZE, stdin);
 
+        // Disconnect from server if user inputs control-D
         if (input == NULL) {
             printf("Disconnecting from server\n");
 
             close(sock);
             exit(0);
-            //return 0;
         }
 
+        // Write bytes to the socket
         int writeBytes = writen(sock, input, strlen(input));
         if (writeBytes != strlen(input)) {
             printf("Failed to send data to server. Error = {%s}\n", strerror(errno));
@@ -161,6 +157,7 @@ int main(int argc, char* argv[]) {
             exit(EXIT_FAILURE);
         }
         
+        // Receive message back through socket, which should be the same length as the original message
         int recBytes = readline(sock, readBuff, strlen(input));
         if (recBytes == -1) {
             printf("Failed to read data from server. Error = {%s}\n", strerror(errno));
