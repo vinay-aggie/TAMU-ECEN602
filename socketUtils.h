@@ -7,8 +7,8 @@
 
 #define BUFFER_SIZE 512
 
-int writen(int clientFd, const char *ptrBuf, size_t bytesToWrite);
-
+ssize_t writen(int clientFd, const char *ptrBuf, size_t bytesToWrite);
+ 
 ssize_t readline(int fd, char *ptr, size_t maxlen);
 
 #endif /* SOCKET_UTILS_H */

@@ -5,11 +5,21 @@
 
 #include "socketUtils.h"
 
-// Method to write 'n' bytes to a buffer when provided with a
-// socket descriptor and a pointer to the user level buffer.
-int writen(int clientFd, const char *ptrBuf, size_t bytesToWrite)
+/*******************************************************
+ * writen function:
+ *      Method to write 'n' bytes to a buffer when provided with a socket descriptor and a pointer to the user level buffer.
+ * 
+ * Inputs:
+ *      int clientFd: socket connection between server and client
+ *      const char *ptrBuf: pointer to the buffer containing text to be sent through the socket
+ *      size_t bytesToWrite: size of the packet to send
+ * 
+ * Outputs:
+ *      int: Total number of bytes written to socket
+ ******************************************************/
+ssize_t writen(int clientFd, const char *ptrBuf, size_t bytesToWrite)
 {
-    size_t bytesLeft;
+    ssize_t bytesLeft;
     ssize_t bytesWritten;
 
     bytesLeft = bytesToWrite;
@@ -34,30 +44,40 @@ int writen(int clientFd, const char *ptrBuf, size_t bytesToWrite)
     }
 
     // Ideally this should be 0;
-    return (int)bytesWritten;
+    return bytesWritten;
 }
 
-ssize_t readline(int fd, char *ptr, size_t maxlen) {
-    ssize_t n, rc;
-    char c;
+/* ******************************************************
+ * readline function:
+ *      Reads data of fixed size coming through socket
+ * 
+ * Inputs:
+ *      int fd: socket connection between server and client
+ *      const char *ptrBuf: pointer to the buffer to be filled with text sent through the socket
+ *      size_t bytesToRead: size of the packet that was sent
+ * 
+ * Outputs:
+ *      int: Total number of bytes read from the socket
+ ****************************************************** */
+ssize_t readline(int fd, char *ptrBuff, size_t bytesToRead) {
+    ssize_t bytesLeft;
+    ssize_t bytesRead;
 
-    for (n = 1; n < maxlen; n++) {
-        again:
-            if ((rc = read(fd, &c, 1)) == 1) {
-                *ptr++ = c;
-                if (c == '\n')
-                    break;
-            } else if (rc == 0) {
-                *ptr = 0;
-                return (n - 1);
+    bytesLeft = bytesToRead;
+    while (bytesLeft > 0) {
+        if ((bytesRead = read(fd, ptrBuff, bytesLeft)) < 0) {
+            if (errno == EINTR) {
+                bytesRead = 0;
             } else {
-                if (errno == EINTR) {
-                    goto again;
-                }
                 return -1;
             }
+        } else if (bytesRead == 0) {
+            break;
+        }
+
+        bytesLeft -= bytesRead;
+        ptrBuff += bytesRead;
     }
 
-    *ptr = 0;
-    return n;
+    return bytesToRead - bytesLeft;
 }

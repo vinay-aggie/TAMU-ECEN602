@@ -15,7 +15,7 @@ $(TARGET1): client.o socketUtils.o
 	$(CC) $(CFLAGS) -o $(TARGET1) client.o socketUtils.o
 
 $(TARGET2): server.o socketUtils.o
-	$(CC) $(CFLAGS) -o $(TARGET2) server.o
+	$(CC) $(CFLAGS) -o $(TARGET2) server.o socketUtils.o
 
 # Compile the individual files but do not link.
 client.o: client.c
