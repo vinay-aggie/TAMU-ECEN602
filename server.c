@@ -7,6 +7,7 @@
 #include <sys/socket.h>
 #include <netinet/in.h>
 
+//#include "socketUtils.h"
 // const definitions.
 #define BUFFER_SIZE 512
 #define MAX_CONNECTIONS 10
@@ -74,7 +75,7 @@ int main (int argc, char *argv[])
     serverAddr.sin_addr.s_addr = INADDR_ANY;
 
     int retVal;
-    bind(serverSocketFd, (struct sockaddr*)&serverAddr, sizeof(serverAddr));
+    int retVal = bind(serverSocketFd, (struct sockaddr*)&serverAddr, sizeof(serverAddr));
     if (retVal == -1)
     {
         printf("Failed to bind socket! retVal = [%d] Error = {%s}\n", retVal, strerror(errno));
