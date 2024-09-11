@@ -40,9 +40,9 @@ int writen(int clientFd, const char *ptrBuf, size_t bytesToWrite)
     return (int)bytesWritten;
 }
 
-ssize_t readn(int fd, char *ptrBuff, size_t bytesToRead) {
-    size_t bytesLeft;
-    ssize_t bytesRead;
+int readline(int fd, char *ptrBuff, size_t bytesToRead) {
+    int bytesLeft;
+    int bytesRead;
 
     bytesLeft = bytesToRead;
     while (bytesLeft > 0) {
@@ -63,7 +63,7 @@ ssize_t readn(int fd, char *ptrBuff, size_t bytesToRead) {
     return bytesToRead - bytesLeft;
 }
 
-ssize_t readline(int fd, char *ptr, size_t maxlen) {
+/*ssize_t readline(int fd, char *ptr, size_t maxlen) {
     ssize_t n, rc;
     char c;
 
@@ -86,7 +86,7 @@ ssize_t readline(int fd, char *ptr, size_t maxlen) {
 
     *ptr = 0;
     return n;
-}
+}*/
 
 char* convertToString(char* a, int size) {
     int i;
@@ -139,6 +139,9 @@ int main(int argc, char* argv[]) {
     char readBuff[BUFFER_SIZE];
 
     while (1) {
+        memset(sendBuff, 0, sizeof(sendBuff));
+        memset(readBuff, 0, sizeof(readBuff));
+
         printf("Enter text to send to server: (Press Control-D to stop)\n");
 
         char* input = fgets(sendBuff, BUFFER_SIZE, stdin);
@@ -151,11 +154,23 @@ int main(int argc, char* argv[]) {
             //return 0;
         }
 
-        writen(sock, input, strlen(input));
+        int writeBytes = writen(sock, input, strlen(input));
+        if (writeBytes != strlen(input)) {
+            printf("Failed to send data to server. Error = {%s}\n", strerror(errno));
+            close(sock);
+            exit(EXIT_FAILURE);
+        }
         
-        //readline(sock, readBuff, BUFFER_SIZE);
-        readn(sock, readBuff, strlen(input));
-        //read(sock, buffer, BUFFER_SIZE);
+        int recBytes = readline(sock, readBuff, strlen(input));
+        if (recBytes == -1) {
+            printf("Failed to read data from server. Error = {%s}\n", strerror(errno));
+            close(sock);
+            exit(EXIT_FAILURE);
+        } else if (recBytes != writeBytes) {
+            printf("Message from server does not match message sent.\n");
+            close(sock);
+            exit(EXIT_FAILURE);
+        }
 
         printf("Message from server: %s\n", readBuff);
     }
