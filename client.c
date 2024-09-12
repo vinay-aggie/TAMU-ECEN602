@@ -65,10 +65,10 @@ int main(int argc, char* argv[]) {
         printf("Enter text to send to server: (Press Control-D to stop)\n");
 
         // Get user input and store in buffer before sending through socket
-        char* input = fgets(sendBuff, BUFFER_SIZE, stdin);
+        fgets(sendBuff, BUFFER_SIZE, stdin);
 
         // Disconnect from server if user inputs control-D
-        if (input == NULL) {
+        if (sendBuff == NULL) {
             printf("Disconnecting from server\n");
 
             close(sock);
@@ -76,15 +76,15 @@ int main(int argc, char* argv[]) {
         }
 
         // Write bytes to the socket
-        ssize_t writeBytes = writen(sock, input, strlen(input));
-        if (writeBytes != strlen(input)) {
+        ssize_t writeBytes = writen(sock, sendBuff, strlen(sendBuff));
+        if (writeBytes != strlen(sendBuff)) {
             printf("Failed to send data to server. Error = {%s}\n", strerror(errno));
             close(sock);
             exit(EXIT_FAILURE);
         }
         
         // Receive message back through socket, which should be the same length as the original message
-        ssize_t recBytes = readline(sock, readBuff, strlen(input));
+        ssize_t recBytes = readline(sock, readBuff, strlen(sendBuff));
         if (recBytes == -1) {
             printf("Failed to read data from server. Error = {%s}\n", strerror(errno));
             close(sock);
