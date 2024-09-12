@@ -12,39 +12,6 @@
 // const definitions.
 #define MAX_CONNECTIONS 100
 
-/*
-// Method to write 'n' bytes to a buffer when provided with a
-// socket descriptor and a pointer to the user level buffer.
-int writen(int clientFd, const char *ptrBuf, size_t bytesToWrite)
-{
-    size_t bytesLeft;
-    ssize_t bytesWritten;
-
-    bytesLeft = bytesToWrite;
-    while (bytesLeft > 0)
-    {
-        bytesWritten = send(clientFd, ptrBuf, bytesLeft, 0);
-        if (bytesWritten < 0)
-        {
-            if (errno == EINTR)
-            {
-                bytesWritten = 0;
-                continue;
-            }
-            else
-            {
-                return -1;
-            }
-        }
-
-        bytesLeft = bytesLeft - bytesWritten;
-        ptrBuf = ptrBuf + bytesWritten;
-    }
-
-    // Ideally this should be 0;
-    return (int)bytesWritten;
-} */
-
 int main (int argc, char *argv[])
 {
     // Some pre-flight checks.
