@@ -52,24 +52,26 @@ int main (int argc, char *argv[])
     if (retVal == -1)
     {
         printf("Failed to bind socket! retVal = [%d] Error = {%s}\n", retVal, strerror(errno));
+        close(serverSocketFd);
         exit(EXIT_FAILURE);
     }
     printf("Socket binding successfull.\n");
 
-    // Listen for connections. We can handle 100 connections simlutaneously.
+    // Listen for connections. We can handle upto 100 connections simlutaneously.
     // 100 should be good for now but change this value as and recompile if required.
     retVal = listen(serverSocketFd, MAX_CONNECTIONS);
     // Exit if listening failed.
     if (retVal == -1)
     {
         printf("Failed to listen for incoming connections! retVal = [%d] Error = {%s}\n", retVal, strerror(errno));
+        close(serverSocketFd);
         exit(EXIT_FAILURE);
     }
     printf("Listening for incoming connections...\n");
 
     char storageBuf[BUFFER_SIZE];
     // Infinitely monitor for incoming client connections.
-    while(1)
+    while (1)
     {
         socklen_t clientAddrLen = sizeof(clientAddr);
         // 'accept' is blocking. If this line executes with a return of 0 then we got a client connection.
@@ -77,8 +79,8 @@ int main (int argc, char *argv[])
         if (clientSocketFd == -1)
         {
             printf("Failed to establish a connection with the client! clientSocketFd = [%d] Error = {%s}\n", clientSocketFd, strerror(errno));
-            close(serverSocketFd);
-            exit(EXIT_FAILURE);
+            // Try to connect again!
+            continue;
         }
 
         printf("Successfully established a connection with the client!\n");
@@ -92,6 +94,9 @@ int main (int argc, char *argv[])
         if (forkRet < 0)
         {
             printf("Failed to fork new client handler. Exiting! Error = {%s}\n", strerror(errno));
+            // cleanup all descriptors and exit
+            close(serverSocketFd);
+            close(clientSocketFd);
             exit(EXIT_FAILURE);
         }
         if (forkRet > 0)
@@ -135,5 +140,6 @@ int main (int argc, char *argv[])
 
     }
 
+    close(serverSocketFd);
     return 0;
 }
