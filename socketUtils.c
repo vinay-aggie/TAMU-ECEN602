@@ -22,6 +22,10 @@ ssize_t writen(int clientFd, const char *ptrBuf, size_t bytesToWrite)
     ssize_t bytesLeft;
     ssize_t bytesWritten;
 
+    if (bytesToWrite % BUFFER_SIZE == 1) {
+        bytesToWrite -= 1;
+    }
+
     bytesLeft = bytesToWrite;
     while (bytesLeft > 0)
     {

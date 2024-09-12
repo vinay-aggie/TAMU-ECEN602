@@ -5,7 +5,7 @@
 
 #include <stdio.h>
 
-#define BUFFER_SIZE 512
+#define BUFFER_SIZE 20
 
 ssize_t writen(int clientFd, const char *ptrBuf, size_t bytesToWrite);
  

@@ -10,8 +10,6 @@
 
 #include "socketUtils.h"
 
-#define BUFFER_SIZE 512
-
 
 int main(int argc, char* argv[]) {
     // Verify number of arguments is correct and notify user if not correct
@@ -68,8 +66,8 @@ int main(int argc, char* argv[]) {
         fgets(sendBuff, BUFFER_SIZE, stdin);
 
         // Disconnect from server if user inputs control-D
-        if (sendBuff == NULL) {
-            printf("Disconnecting from server\n");
+        if (feof(stdin)) {
+            printf("\nDisconnecting from server\n");
 
             close(sock);
             exit(0);
@@ -77,11 +75,6 @@ int main(int argc, char* argv[]) {
 
         // Write bytes to the socket
         ssize_t writeBytes = writen(sock, sendBuff, strlen(sendBuff));
-        if (writeBytes != strlen(sendBuff)) {
-            printf("Failed to send data to server. Error = {%s}\n", strerror(errno));
-            close(sock);
-            exit(EXIT_FAILURE);
-        }
         
         // Receive message back through socket, which should be the same length as the original message
         ssize_t recBytes = readline(sock, readBuff, strlen(sendBuff));
