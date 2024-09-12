@@ -19,6 +19,8 @@
   * Development of Makefile.
   * Documentation.
 
+## Workflow
+## ![Untitled Diagram drawio](https://github.com/user-attachments/assets/7828120e-7d50-4167-83ab-13460f191415)
 
 ## Test cases
 
