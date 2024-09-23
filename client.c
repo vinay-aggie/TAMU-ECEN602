@@ -1,14 +1,16 @@
 #include <stdio.h>
-#include <fcntl.h>
+//#include <fcntl.h>
 #include <errno.h>
 #include <string.h>
 #include <stdlib.h>
 #include <unistd.h>
-#include <sys/socket.h>
-#include <netinet/in.h>
+//#include <sys/socket.h>
+//#include <netinet/in.h>
 #include <arpa/inet.h>
+#include <sys/select.h>
 
 #define MAX_USERNAME 128
+#define BUFFER_SIZE 256
 
 
 int main(int argc, char* argv[]) {
@@ -32,7 +34,7 @@ int main(int argc, char* argv[]) {
     // Initialize socket and throw an error if failure
     sock = socket(AF_INET, SOCK_STREAM, 0);
     if (sock == -1) {
-        printf("Failed to create a socket.\n{%s}\n", strerror(errno));
+        printf("Failed to create a socket.\n");
         exit(EXIT_FAILURE);        
     }
 
@@ -60,9 +62,58 @@ int main(int argc, char* argv[]) {
     printf("Enter a username\n");
     fgets(username, MAX_USERNAME, stdin);
 
+    int sendUsername = send(sock, username, strlen(username), 0);
+    if (sendUsername == -1) {
+        printf("Failed to send username\n");
+        exit(EXIT_FAILURE);
+    }
+
     printf("Hello, %s\n", username);
 
-    int sel = select(maxfdp1, readset, writeset, exceptset, NULL);
+    fd_set read_fds;
+    char buffer[BUFFER_SIZE];
+
+    while (1) {
+        FD_ZERO(&read_fds);
+        FD_SET(sock, &read_fds);
+        FD_SET(STDIN_FILENO, &read_fds);
+
+        int max_fd = sock > STDIN_FILENO ? sock : STDIN_FILENO;
+        int activity = select(max_fd + 1, &read_fds, NULL, NULL, NULL);
+
+        if (activity < 0) {
+            perror("select error");
+            exit(EXIT_FAILURE);
+        }
+
+        // Check if there is data from the server
+        if (FD_ISSET(sock, &read_fds)) {
+            int bytes_received = recv(sock, buffer, sizeof(buffer) - 1, 0);
+            if (bytes_received <= 0) {
+                printf("Disconnected from server.\n");
+                close(sock);
+                exit(EXIT_SUCCESS);
+            }
+            buffer[bytes_received] = '\0'; // Null-terminate the string
+            printf("Message from server: %s\n", buffer);
+        }
+
+        // Check if there is user input
+        if (FD_ISSET(STDIN_FILENO, &read_fds)) {
+            if (fgets(buffer, sizeof(buffer), stdin) != NULL) {
+                // Remove newline character from input
+                buffer[strcspn(buffer, "\n")] = '\0';
+
+                // Send the message to the server
+                if (send(sock, buffer, strlen(buffer), 0) < 0) {
+                    perror("send error");
+                }
+            }
+        }
+    }
+
+
+    //int sel = select(maxfdp1, readset, writeset, exceptset, NULL);
 
     /*while (1) {
         memset(sendBuff, 0, sizeof(sendBuff));
