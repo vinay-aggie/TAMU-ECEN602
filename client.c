@@ -10,8 +10,47 @@
 #include <sys/select.h>
 
 #define MAX_USERNAME 128
-#define BUFFER_SIZE 256
+#define BUFFER_SIZE 65536
 
+// protocol version
+#define VERSION 3
+
+// header types
+#define JOIN 2
+#define SEND 4
+#define FWD 3
+
+// header length
+#define HEADER_LENGTH 4
+
+
+int sendMessage(int socket, int version, int type, int length, const char *payload) {
+    uint8_t header[HEADER_LENGTH];
+
+    /*header[0] = (version << 7) | (type & 0x7F);
+    header[1] = (length >> 8) & 0xFF;
+    header[2] = length & 0xFF;*/
+
+    header[0] = version >> 1;
+    header[1] = ((version & 0x01) << 7) + type;
+    header[2] = length >> 8;
+    header[3] = length & 0xFF;
+
+    size_t packet_size = HEADER_LENGTH + strlen(payload);
+
+    char* message = malloc(packet_size);
+
+    memcpy(message, header, HEADER_LENGTH);
+    memcpy(message + HEADER_LENGTH, payload, strlen(payload));
+
+    for (int i = 0; i < HEADER_LENGTH + strlen(payload); i++) {
+        printf("%i, %#x\n", i, message[i]);
+    }
+
+    ssize_t bytes_sent = send(socket, message, packet_size, 0);
+    
+    return bytes_sent;
+}
 
 int main(int argc, char* argv[]) {
     // Verify number of arguments is correct and notify user if not correct
@@ -62,16 +101,16 @@ int main(int argc, char* argv[]) {
     printf("Enter a username\n");
     fgets(username, MAX_USERNAME, stdin);
 
-    int sendUsername = send(sock, username, strlen(username), 0);
+    int sendUsername = sendMessage(sock, 3, 2, strlen(username), username); //send(sock, username, strlen(username), 0);
     if (sendUsername == -1) {
         printf("Failed to send username\n");
         exit(EXIT_FAILURE);
     }
 
-    printf("Hello, %s\n", username);
+    printf("Welcome, %s\n", username);
 
     fd_set read_fds;
-    char buffer[BUFFER_SIZE];
+    char message[BUFFER_SIZE];
 
     while (1) {
         FD_ZERO(&read_fds);
@@ -88,24 +127,37 @@ int main(int argc, char* argv[]) {
 
         // Check if there is data from the server
         if (FD_ISSET(sock, &read_fds)) {
-            int bytes_received = recv(sock, buffer, sizeof(buffer) - 1, 0);
+            int bytes_received = recv(sock, message, sizeof(message) - 1, 0);
             if (bytes_received <= 0) {
                 printf("Disconnected from server.\n");
                 close(sock);
                 exit(EXIT_SUCCESS);
             }
-            buffer[bytes_received] = '\0'; // Null-terminate the string
-            printf("Message from server: %s\n", buffer);
+            message[bytes_received] = '\0'; // Null-terminate the string
+            printf("Message from server: %s\n", message);
         }
 
         // Check if there is user input
         if (FD_ISSET(STDIN_FILENO, &read_fds)) {
-            if (fgets(buffer, sizeof(buffer), stdin) != NULL) {
+            if (fgets(message, sizeof(message), stdin) != NULL) {
                 // Remove newline character from input
-                buffer[strcspn(buffer, "\n")] = '\0';
+                message[strcspn(message, "\n")] = '\0';
+
+                /*uint8_t header[HEADER_LENGTH];
+
+                int vrsn = 3;
+                int type = SEND;
+                uint8_t length = htonl(strlen(message));
+
+                size_t packet_size = htonl(strlen(message)) + HEADER_LENGTH;
+                char* buffer = malloc(packet_size);
+
+                memcpy(buffer, &header, HEADER_LENGTH);*/
+
+                int sendData = sendMessage(sock, 3, 4, strlen(message), message);
 
                 // Send the message to the server
-                if (send(sock, buffer, strlen(buffer), 0) < 0) {
+                if (sendData) {
                     perror("send error");
                 }
             }
