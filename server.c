@@ -14,6 +14,9 @@
 
 int main (int argc, char *argv[])
 {
+    //freopen("/dev/null", "w", stdout);
+    char storageBuf[BUFFER_SIZE];
+
     // Some pre-flight checks.
     if (argc > 2)
     {
@@ -29,7 +32,7 @@ int main (int argc, char *argv[])
     // Fetch the port as argument.
     char *portToConnect = argv[1];
 
-    int serverSocketFd, clientSocketFd;
+    int serverSocketFd;
     struct sockaddr_in serverAddr, clientAddr;
 
     // Create a socket descriptor for an IPV4 address and handling TCP connections.
@@ -69,89 +72,118 @@ int main (int argc, char *argv[])
     }
     printf("Listening for incoming connections...\n");
 
-    char storageBuf[BUFFER_SIZE];
-    int fdMax;
-    fd_set read_fds;
-    fd_set master;
-    FD_ZERO(&read_fds);
-    FD_ZERO(&master);
-    FD_SET(serverSocketFd, &master);
+    int MaxFd;
+    fd_set readFds;
+    fd_set masterListFds;
+    FD_ZERO(&readFds);
+    FD_ZERO(&masterListFds);
 
-    fdMax = serverSocketFd;
+    FD_SET(serverSocketFd, &masterListFds);
+    MaxFd = serverSocketFd;
+
     while (1)
     {
-        read_fds = master;
-        if (select(fdMax + 1, &read_fds, NULL, NULL, NULL) == -1)
+        // Take a copy of the master list of file descriptors.
+        // This is because the file descriptors passed to select is cleared
+        // after processing.
+        readFds = masterListFds;
+        printf("MAX File Descriptor is {%d}\n", MaxFd);
+
+        int retVal = select(MaxFd + 1, &readFds, NULL, NULL, NULL);
+        if (retVal == -1)
         {
-            perror("select");
-            exit (EXIT_FAILURE);
+            printf("Failed to multiplex on the Client desciptors! retVal = (%d) Error = {%s}\n",
+                    retVal, strerror(errno));
+            exit(EXIT_FAILURE);
         }
+        printf("We got an alert on a monitored descriptor\n");
 
-        for (int i = 0; i <= fdMax; i++)
+        for (int descriptor = 0; descriptor <= MaxFd; descriptor++)
         {
-            if (FD_ISSET(i, &read_fds))
+            if (FD_ISSET(descriptor, &readFds) == 0)
             {
-                if (i == serverSocketFd)
-                {
-                    socklen_t clientAddrLen = sizeof(clientAddr);
-                    clientSocketFd = accept(serverSocketFd, (struct sockaddr*)&clientAddr, &clientAddrLen);
-                    if (clientSocketFd == -1)
-                    {
-                        printf("Failed to establish a connection with the client! clientSocketFd = [%d] Error = {%s}\n", clientSocketFd, strerror(errno));
-                    }
-                    else
-                    {
-                        FD_SET(clientSocketFd, &master);
-                        if (clientSocketFd > fdMax)
-                        {
-                            fdMax = clientSocketFd;
-                        }
-                        printf("Successfully established a connection with the client!\n");
-                        printf("Waiting for data...\n");
-                    }
-                }
-                else
-                {
-                    memset(storageBuf, 0, sizeof(storageBuf));
-                    int recBytes = read(clientSocketFd, storageBuf, BUFFER_SIZE);
-                    if (recBytes == -1)
-                    {
-                        printf("Failed to read data from socket! Error = {%s}\n", strerror(errno));
-                        close(clientSocketFd);
-                        FD_CLR(i, &master);
-                        continue;
-                    }
-                    // Terminate when an end-of-file is received indicated by 0 bytes received.
-                    if (recBytes == 0)
-                    {
-                        printf("Received EOF from client. Terminating connection!\n");
-                        close(clientSocketFd);
-                        FD_CLR(i, &master);
-                        continue;
-                    }
-                    printf("Received data!\n");
-                    printf("Message from client: %s \n", storageBuf);
+                continue;
+            }
 
-                    // send to all other connections!
-                    for (int j = 0; j <= fdMax; j++)
-                    {
-                        printf("Sending data to client (%d)\n", j);
-                        if (FD_ISSET(j, &master))
-                        {
-                            if ((j != serverSocketFd) && (j != i))
-                            {
-                                if (send(j, storageBuf, strlen(storageBuf), 0) == -1)
-                                {
-                                    perror("sending error!\n");
-                                }
-                            }
-                        }
-                    }
+            printf("We got an alert on descriptor = (%d)\n", descriptor);
+            // We have a File descriptor ready for reading.
+            if (descriptor == serverSocketFd)
+            {
+                printf("Got a new connection!\n");
+                socklen_t clientAddrLen = sizeof(clientAddr);
+                int clientSocketFd = accept(serverSocketFd, (struct sockaddr*)&clientAddr, &clientAddrLen);
+                if (clientSocketFd == -1)
+                {
+                    printf("Failed to establish a connection with the client! clientSocketFd = [%d] Error = {%s}\n",
+                           clientSocketFd, strerror(errno));
+                    continue;
+                }
+
+                printf("Successfully established a connection with the client!\n");
+                printf("Waiting for data...\n");
+
+                // Add new client FD to the master list.
+                FD_SET(clientSocketFd, &masterListFds);
+                if (clientSocketFd > MaxFd)
+                {
+                    // Set new maximum based on the above
+                    // condition.
+                    MaxFd = clientSocketFd;
                 }
             }
+            else
+            {
+                printf("Received data!\n");
+                memset(storageBuf, 0, sizeof(storageBuf));
+                int recBytes = read(descriptor, storageBuf, BUFFER_SIZE);
+                if (recBytes == -1)
+                {
+                    printf("Failed to read data from socket! Error = {%s}\n", strerror(errno));
+                    close(descriptor);
+                    FD_CLR(descriptor, &masterListFds);
+                    continue;
+                }
+                // Terminate when an end-of-file is received indicated by 0 bytes received.
+                if (recBytes == 0)
+                {
+                    printf("Received EOF from client. Terminating connection!\n");
+                    close(descriptor);
+                    FD_CLR(descriptor, &masterListFds);
+                    continue;
+                }
+                printf("Received data!\n");
+                printf("Message from client: %s \n", storageBuf);
+
+                // send to all other connections!
+                for (int allConnections = 0; allConnections <= MaxFd; allConnections++)
+                {
+                    if (FD_ISSET(allConnections, &masterListFds) == 0)
+                    {
+                        // Don't send data to non-existant file desciptors.
+                        continue;
+                    }
+
+                    // Don't send data to listening socket as well as the client
+                    // from which we received data.
+                    if ((allConnections == serverSocketFd) /*|| (allConnections == descriptor)*/)
+                    {
+                        continue;
+                    }
+
+                    printf("Sending data to client (%d)\n", allConnections);
+
+                    int retVal = send(allConnections, storageBuf, strlen(storageBuf), 0);
+                    if (retVal == -1)
+                    {
+                        printf("Failed to establish a connection with the client! clientSocketFd = [%d] Error = {%s}\n",
+                                allConnections, strerror(errno));
+                    }
+                }
+                printf("Finished sending data\n");
+            }
+
+            printf("Finished iterating through descriptors\n");
         }
-
-
     }
 
     return 0;
