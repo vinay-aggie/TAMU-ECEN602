@@ -130,60 +130,60 @@ int main (int argc, char *argv[])
                     // condition.
                     MaxFd = clientSocketFd;
                 }
+
+                continue;
             }
-            else
+
+            printf("Received data!\n");
+            memset(storageBuf, 0, sizeof(storageBuf));
+            int recBytes = read(descriptor, storageBuf, BUFFER_SIZE);
+            if (recBytes == -1)
             {
-                printf("Received data!\n");
-                memset(storageBuf, 0, sizeof(storageBuf));
-                int recBytes = read(descriptor, storageBuf, BUFFER_SIZE);
-                if (recBytes == -1)
-                {
-                    printf("Failed to read data from socket! Error = {%s}\n", strerror(errno));
-                    close(descriptor);
-                    FD_CLR(descriptor, &masterListFds);
-                    continue;
-                }
-                // Terminate when an end-of-file is received indicated by 0 bytes received.
-                if (recBytes == 0)
-                {
-                    printf("Received EOF from client. Terminating connection!\n");
-                    close(descriptor);
-                    FD_CLR(descriptor, &masterListFds);
-                    continue;
-                }
-                printf("Received data!\n");
-                printf("Message from client: %s \n", storageBuf);
-
-                // send to all other connections!
-                for (int allConnections = 0; allConnections <= MaxFd; allConnections++)
-                {
-                    if (FD_ISSET(allConnections, &masterListFds) == 0)
-                    {
-                        // Don't send data to non-existant file desciptors.
-                        continue;
-                    }
-
-                    // Don't send data to listening socket as well as the client
-                    // from which we received data.
-                    if ((allConnections == serverSocketFd) /*|| (allConnections == descriptor)*/)
-                    {
-                        continue;
-                    }
-
-                    printf("Sending data to client (%d)\n", allConnections);
-
-                    int retVal = send(allConnections, storageBuf, strlen(storageBuf), 0);
-                    if (retVal == -1)
-                    {
-                        printf("Failed to establish a connection with the client! clientSocketFd = [%d] Error = {%s}\n",
-                                allConnections, strerror(errno));
-                    }
-                }
-                printf("Finished sending data\n");
+                printf("Failed to read data from socket! Error = {%s}\n", strerror(errno));
+                close(descriptor);
+                FD_CLR(descriptor, &masterListFds);
+                continue;
             }
+            // Terminate when an end-of-file is received indicated by 0 bytes received.
+            if (recBytes == 0)
+            {
+                printf("Received EOF from client. Terminating connection!\n");
+                close(descriptor);
+                FD_CLR(descriptor, &masterListFds);
+                continue;
+            }
+            printf("Received data!\n");
+            printf("Message from client: %s \n", storageBuf);
 
-            printf("Finished iterating through descriptors\n");
+            // send to all other connections!
+            for (int allConnections = 0; allConnections <= MaxFd; allConnections++)
+            {
+                if (FD_ISSET(allConnections, &masterListFds) == 0)
+                {
+                    // Don't send data to non-existant file desciptors.
+                    continue;
+                }
+
+                // Don't send data to listening socket as well as the client
+                // from which we received data.
+                if ((allConnections == serverSocketFd) || (allConnections == descriptor))
+                {
+                    continue;
+                }
+
+                printf("Sending data to client (%d)\n", allConnections);
+
+                int retVal = send(allConnections, storageBuf, strlen(storageBuf), 0);
+                if (retVal == -1)
+                {
+                    printf("Failed to establish a connection with the client! clientSocketFd = [%d] Error = {%s}\n",
+                            allConnections, strerror(errno));
+                }
+            }
+            printf("Finished sending data\n");
         }
+
+        printf("Finished iterating through descriptors\n");
     }
 
     return 0;
