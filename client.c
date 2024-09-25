@@ -13,18 +13,19 @@
 
 int main(int argc, char* argv[]) {
     // Verify number of arguments is correct and notify user if not correct
-    if (argc > 3) {
-        printf("Too many arguments. Please only provide 3 arguments.\n");
+    if (argc > 4) {
+        printf("Too many arguments. Please only provide 4 arguments.\n");
         exit(EXIT_FAILURE);
-    } else if (argc < 3) {
-        printf("Too few arguments. Please provide 3 arguments.\n");
+    } else if (argc < 4) {
+        printf("Too few arguments. Please provide 4 arguments.\n");
         exit(EXIT_FAILURE);
     } else {
         printf("Starting client.\n");
     }
 
-    char* ip = argv[1];
-    char* port = argv[2];
+    char* username = argv[1];
+    char* ip = argv[2];
+    char* port = argv[3];
 
     int sock;
     struct sockaddr_in serverAddr;
@@ -33,7 +34,7 @@ int main(int argc, char* argv[]) {
     sock = socket(AF_INET, SOCK_STREAM, 0);
     if (sock == -1) {
         printf("Failed to create a socket.\n");
-        exit(EXIT_FAILURE);        
+        exit(EXIT_FAILURE);
     }
 
     printf("Socket created successfully\n");
@@ -51,10 +52,6 @@ int main(int argc, char* argv[]) {
     }
 
     printf("Successfully connected to server.\n");
-
-    char username[MAX_USERNAME];
-    printf("Enter a username\n");
-    fgets(username, MAX_USERNAME, stdin);
 
     int sendUsername = sendMessage(sock, 3, 2, strlen(username), username); //send(sock, username, strlen(username), 0);
     if (sendUsername == -1) {
@@ -83,7 +80,7 @@ int main(int argc, char* argv[]) {
         // Check if there is data from the server
         if (FD_ISSET(sock, &read_fds)) {
             int bytes_received = receiveMessage(sock, message, sizeof(message) - 1);
-            if (bytes_received <= 0) {
+            if (bytes_received == -1) {
                 printf("Disconnected from server.\n");
                 close(sock);
                 exit(EXIT_SUCCESS);

@@ -159,7 +159,7 @@ int main (int argc, char *argv[])
             {
                 if (FD_ISSET(allConnections, &masterListFds) == 0)
                 {
-                    // Don't send data to non-existant file desciptors.
+                    // Don't send data to non-existant file descriptors.
                     continue;
                 }
 
@@ -172,7 +172,9 @@ int main (int argc, char *argv[])
 
                 printf("Sending data to client (%d)\n", allConnections);
 
-                int retVal = send(allConnections, storageBuf, strlen(storageBuf), 0);
+                //int retVal = send(allConnections, storageBuf, strlen(storageBuf), 0);
+                int sendData = sendMessage(allConnections, 3, 3, strlen(storageBuf), storageBuf);
+
                 if (retVal == -1)
                 {
                     printf("Failed to establish a connection with the client! clientSocketFd = [%d] Error = {%s}\n",
