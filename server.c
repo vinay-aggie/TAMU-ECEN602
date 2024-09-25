@@ -6,36 +6,9 @@
 #include <unistd.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
+#include <sys/select.h>
 
-// const definitions.
-#define MAX_CONNECTIONS 100
-
-#define BUFFER_SIZE 1024
-
-int receiveMessage(int fd, char *buf, int buf_size)
-{
-    int recBytes = read(fd, buf, buf_size);
-    if (recBytes == -1)
-    {
-        printf("Failed to read data from socket! Error = {%s}\n", strerror(errno));
-        return -1;
-    }
-    // Terminate when an end-of-file is received indicated by 0 bytes received.
-    if (recBytes == 0)
-    {
-        printf("Received EOF from client. Terminating connection!\n");
-        return -1;
-    }
-
-    printf("Length of received message = (%d)\n", buf_size);
-
-    uint16_t version = ((buf[0] << 1) | ((buf[1] & 0x80) >> 7));
-    uint16_t type = buf[1] & 0x7F;
-    uint16_t length = (buf[2] << 8 | buf[3]);
-
-    printf("Version = (%d), Type = (%d), Length = (%d)\n", version, type, length);
-    exit (EXIT_FAILURE);
-}
+#include "socketUtils.c"
 
 int main (int argc, char *argv[])
 {

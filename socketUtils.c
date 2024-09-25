@@ -1,9 +1,66 @@
+#include "socketUtils.h"
+
 #include <stdio.h>
 #include <errno.h>
 #include <unistd.h>
 #include <sys/socket.h>
+#include <stdlib.h>
 
-#include "socketUtils.h"
+
+int sendMessage(int socket, uint16_t version, uint16_t type, uint16_t length, const char *payload) {
+    uint8_t header[HEADER_LENGTH];
+
+    header[0] = version >> 1;
+    header[1] = (((version & 0x01) << 7) + (type & 0x7F));
+    header[2] = length >> 8;
+    header[3] = length & 0xFF;
+
+    size_t packet_size = HEADER_LENGTH + strlen(payload);
+
+    unsigned char* message = malloc(packet_size);
+
+    memcpy(message, header, HEADER_LENGTH);
+    memcpy(message + HEADER_LENGTH, payload, strlen(payload));
+
+    ssize_t bytes_sent = send(socket, message, packet_size, 0);
+    
+    return bytes_sent;
+}
+
+int receiveMessage(int fd, char *buf, int buf_size)
+{
+    char tempBuff[BUFFER_SIZE];
+
+    int recBytes = read(fd, tempBuff, tempBuff);
+    if (recBytes == -1)
+    {
+        printf("Failed to read data from socket! Error = {%s}\n", strerror(errno));
+        return -1;
+    }
+    // Terminate when an end-of-file is received indicated by 0 bytes received.
+    if (recBytes == 0)
+    {
+        printf("Received EOF from client. Terminating connection!\n");
+        return -1;
+    }
+
+    printf("Length of received message = (%d)\n", buf_size);
+
+    uint16_t version = ((tempBuff[0] << 1) | ((tempBuff[1] & 0x80) >> 7));
+    uint16_t type = tempBuff[1] & 0x7F;
+    uint16_t length = (tempBuff[2] << 8 | tempBuff[3]);
+
+    printf("Version = (%d), Type = (%d), Length = (%d)\n", version, type, length);
+
+    for (int i = 0; i < length; i++) {
+        buf[i] = tempBuff[i + HEADER_LENGTH];
+    }
+    
+    //exit (EXIT_FAILURE);
+
+    return recBytes;
+}
+
 
 /*******************************************************
  * writen function:
