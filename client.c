@@ -24,7 +24,7 @@
 #define HEADER_LENGTH 4
 
 
-int sendMessage(int socket, int version, int type, int length, const char *payload) {
+int sendMessage(int socket, uint16_t version, uint16_t type, uint16_t length, const char *payload) {
     uint8_t header[HEADER_LENGTH];
 
     /*header[0] = (version << 7) | (type & 0x7F);
@@ -32,18 +32,18 @@ int sendMessage(int socket, int version, int type, int length, const char *paylo
     header[2] = length & 0xFF;*/
 
     header[0] = version >> 1;
-    header[1] = ((version & 0x01) << 7) + type;
+    header[1] = (((version & 0x01) << 7) + (type & 0x7F));
     header[2] = length >> 8;
     header[3] = length & 0xFF;
 
     size_t packet_size = HEADER_LENGTH + strlen(payload);
 
-    char* message = malloc(packet_size);
+    unsigned char* message = malloc(packet_size);
 
     memcpy(message, header, HEADER_LENGTH);
     memcpy(message + HEADER_LENGTH, payload, strlen(payload));
 
-    for (int i = 0; i < HEADER_LENGTH + strlen(payload); i++) {
+    for (uint16_t i = 0; i < HEADER_LENGTH + strlen(payload); i++) {
         printf("%i, %#x\n", i, message[i]);
     }
 
