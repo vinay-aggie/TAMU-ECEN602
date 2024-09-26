@@ -8,7 +8,7 @@
 #include <netinet/in.h>
 #include <sys/select.h>
 
-#include "socketUtils.c"
+#include "socketUtils.h"
 
 int main (int argc, char *argv[])
 {

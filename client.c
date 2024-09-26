@@ -9,7 +9,7 @@
 #include <arpa/inet.h>
 #include <sys/select.h>
 
-#include "socketUtils.c"
+#include "socketUtils.h"
 
 int main(int argc, char* argv[]) {
     // Verify number of arguments is correct and notify user if not correct

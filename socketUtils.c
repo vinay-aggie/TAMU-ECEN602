@@ -23,8 +23,6 @@ void addAttribute(char* buff, uint16_t offset, uint16_t type, uint16_t length, c
 
     memcpy(buff + offset, attributeHeader, HEADER_LENGTH);
     memcpy(buff + offset + HEADER_LENGTH, payload, length);
-
-    printf("Howdy\n");
 }
 
 int sendMessage(int socket, uint16_t version, uint16_t type, uint16_t length, const char *payload) {
@@ -79,6 +77,15 @@ int receiveMessage(int fd, char *buf, int buf_size)
     //exit (EXIT_FAILURE);
 
     return recBytes;
+}
+
+int readAttribute(char *readBuff, char* writeBuff, uint16_t offset)
+{
+    // Take in the buffer that holds the message data, a buffer to write to, and an offset
+    // read the buffer, starting at offset, to find the header, determine the length, and fill the writeBuff with the data
+    // return the length of the data, which should be held in writeBuff
+
+    return 0;
 }
 
 
