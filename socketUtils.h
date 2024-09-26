@@ -33,8 +33,6 @@ int sendMessage(int socket, uint16_t version, uint16_t type, uint16_t length, co
 
 int receiveMessage(int fd, char *buf, int buf_size);
 
-ssize_t writen(int clientFd, const char *ptrBuf, size_t bytesToWrite);
- 
-ssize_t readline(int fd, char *ptr, size_t maxlen);
+void readAttribute(char *readBuff, char* writeBuff, uint16_t offset, uint16_t* type, uint16_t* length);
 
 #endif /* SOCKET_UTILS_H */
