@@ -51,7 +51,7 @@ int receiveMessage(int fd, char *buf, int buf_size)
 {
     char tempBuff[BUFFER_SIZE];
 
-    int recBytes = read(fd, tempBuff, strlen(tempBuff));
+    int recBytes = read(fd, tempBuff, BUFFER_SIZE);
     if (recBytes == -1)
     {
         printf("Failed to read data from socket! Error = {%s}\n", strerror(errno));
