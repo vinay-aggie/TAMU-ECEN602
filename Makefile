@@ -4,8 +4,8 @@ CFLAGS = -Wall
 
 # Define the 2 targets. We have a client
 # and a server.
-TARGET1 = echo
-TARGET2 = echos
+TARGET1 = client
+TARGET2 = server
 
 # Rules are applicable for all targets.
 all: $(TARGET1) $(TARGET2)

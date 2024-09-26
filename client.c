@@ -82,7 +82,8 @@ int main(int argc, char* argv[]) {
 
         // Check if there is data from the server
         if (FD_ISSET(sock, &read_fds)) {
-            int bytes_received = receiveMessage(sock, message, sizeof(message) - 1);
+            int version, type, length;
+            int bytes_received = receiveMessage(sock, message, &version, &type, &length);
             if (bytes_received == -1) {
                 printf("Disconnected from server.\n");
                 close(sock);
@@ -97,6 +98,8 @@ int main(int argc, char* argv[]) {
             if (fgets(message, sizeof(message), stdin) != NULL) {
                 // Remove newline character from input
                 char buff[BUFFER_SIZE];
+
+                message[strlen(message) - 1] = '\0';
 
                 addAttribute(buff, 0, 2, strlen(username), username);
                 addAttribute(buff, strlen(username) + HEADER_LENGTH, 4, strlen(message), message);

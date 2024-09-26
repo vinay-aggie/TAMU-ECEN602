@@ -9,6 +9,7 @@
 #include <sys/select.h>
 
 #include "socketUtils.h"
+#include "sbcpProtocol.h"
 
 int main (int argc, char *argv[])
 {
@@ -135,24 +136,19 @@ int main (int argc, char *argv[])
             printf("Received data!\n");
             memset(storageBuf, 0, sizeof(storageBuf));
             //int recBytes = read(descriptor, storageBuf, BUFFER_SIZE);
-            int retVal = receiveMessage(descriptor, storageBuf, BUFFER_SIZE);
+            uint16_t version, type, length;
+            ssize_t recBytes = receiveMessage(descriptor, storageBuf, &version, &type, &length);
             if (retVal == -1)
             {
-                printf("Failed to read data from socket! Error = {%s}\n", strerror(errno));
-                close(descriptor);
-                FD_CLR(descriptor, &masterListFds);
-                continue;
-            }
-            // Terminate when an end-of-file is received indicated by 0 bytes received.
-            if (retVal == 0)
-            {
-                printf("Received EOF from client. Terminating connection!\n");
+                printf("Failed to read data from socket! Closing connection!\n");
                 close(descriptor);
                 FD_CLR(descriptor, &masterListFds);
                 continue;
             }
             printf("Received data!\n");
-            printf("Message from client: %s \n", storageBuf);
+            printf("Decoding message!\n");
+
+            breakAttributes(storageBuf, recBytes, version, type, length);
 
             // send to all other connections!
             for (int allConnections = 0; allConnections <= MaxFd; allConnections++)

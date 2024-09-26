@@ -45,7 +45,7 @@ int sendMessage(int socket, uint16_t version, uint16_t type, uint16_t length, co
     return bytes_sent;
 }
 
-int receiveMessage(int fd, char *buf, int buf_size)
+int receiveMessage(int fd, char *buf, uint16_t *_version, uint16_t *_type, uint16_t *_length)
 {
     char tempBuff[BUFFER_SIZE];
 
@@ -62,7 +62,7 @@ int receiveMessage(int fd, char *buf, int buf_size)
         return -1;
     }
 
-    printf("Length of received message = (%d)\n", buf_size);
+    printf("Length of received message = (%d)\n", recBytes);
 
     uint16_t version = ((tempBuff[0] << 1) | ((tempBuff[1] & 0x80) >> 7));
     uint16_t type = tempBuff[1] & 0x7F;
@@ -73,13 +73,15 @@ int receiveMessage(int fd, char *buf, int buf_size)
     for (int i = 0; i < length; i++) {
         buf[i] = tempBuff[i + HEADER_LENGTH];
     }
-    
-    //exit (EXIT_FAILURE);
+
+    *_version = version;
+    *_type = type;
+    *_length = length;
 
     return recBytes;
 }
 
-void readAttribute(char *readBuff, char* writeBuff, uint16_t offset, uint16_t* type, uint16_t* length)
+void readAttribute(char *readBuff, char* writeBuff, uint16_t offset, uint16_t *_type, uint16_t *_length)
 {
     // Take in the buffer that holds the message data, a buffer to write to, and an offset
     // read the buffer, starting at offset, to find the header, determine the length, and fill the writeBuff with the data
@@ -89,8 +91,11 @@ void readAttribute(char *readBuff, char* writeBuff, uint16_t offset, uint16_t* t
 
     memcpy(header, readBuff + offset, HEADER_LENGTH);
 
-    *type = (header[0] << 8) | (header[1] & 0xff);
-    *length = (header[2] << 8) | (header[3] & 0xff);
+    uint16_t type = (header[0] << 8) | (header[1] & 0xff);
+    uint16_t length = (header[2] << 8) | (header[3] & 0xff);
 
     memcpy(writeBuff, readBuff + offset + HEADER_LENGTH, length);
+
+    *_type = type;
+    *_length = length;
 }

@@ -7,7 +7,7 @@
 #include <stdint.h>
 
 #define MAX_USERNAME 128
-#define BUFFER_SIZE 65536
+#define BUFFER_SIZE 1024
 
 // protocol version
 #define VERSION 3
@@ -31,8 +31,8 @@ void addAttribute(char* buff, uint16_t offset, uint16_t type, uint16_t length, c
 
 int sendMessage(int socket, uint16_t version, uint16_t type, uint16_t length, const char *payload);
 
-int receiveMessage(int fd, char *buf, int buf_size);
+int receiveMessage(int fd, char *buf, uint16_t* _version, uint16_t* _type, uint16_t* _length);
 
-void readAttribute(char *readBuff, char* writeBuff, uint16_t offset, uint16_t* type, uint16_t* length);
+void readAttribute(char *readBuff, char* writeBuff, uint16_t offset, uint16_t* _type, uint16_t* _length);
 
 #endif /* SOCKET_UTILS_H */
