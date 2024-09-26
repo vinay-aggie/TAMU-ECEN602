@@ -148,7 +148,15 @@ int main (int argc, char *argv[])
             printf("Received data!\n");
             printf("Decoding message!\n");
 
-            breakAttributes(storageBuf, recBytes, version, type, length);
+            char messageToForward[BUFFER_SIZE];
+            breakAttributesAndDetermineAction(storageBuf, messageToForward, recBytes, version, type, length);
+            if (type == JOIN)
+            {
+                // do nothing and continue monitoring.
+                printf("Acnowledged user joined!\n");
+                continue;
+            }
+            // otherwise fwd message.
 
             // send to all other connections!
             for (int allConnections = 0; allConnections <= MaxFd; allConnections++)
@@ -169,7 +177,7 @@ int main (int argc, char *argv[])
                 printf("Sending data to client (%d)\n", allConnections);
 
                 //int retVal = send(allConnections, storageBuf, strlen(storageBuf), 0);
-                int sendData = sendMessage(allConnections, 3, 3, strlen(storageBuf), storageBuf);
+                int sendData = sendMessage(allConnections, VERSION, FWD, strlen(messageToForward), messageToForward);
 
                 if (retVal == -1)
                 {
