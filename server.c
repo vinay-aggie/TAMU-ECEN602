@@ -15,6 +15,7 @@ int main (int argc, char *argv[])
 {
     //freopen("/dev/null", "w", stdout);
     char storageBuf[BUFFER_SIZE];
+    char messageToForward[BUFFER_SIZE];
 
     // Some pre-flight checks.
     if (argc > 2)
@@ -134,7 +135,6 @@ int main (int argc, char *argv[])
             }
 
             printf("Received data!\n");
-            memset(storageBuf, 0, sizeof(storageBuf));
             //int recBytes = read(descriptor, storageBuf, BUFFER_SIZE);
             uint16_t version, type, length;
             ssize_t recBytes = receiveMessage(descriptor, storageBuf, &version, &type, &length);
@@ -148,8 +148,10 @@ int main (int argc, char *argv[])
             printf("Received data!\n");
             printf("Decoding message!\n");
 
-            char messageToForward[BUFFER_SIZE];
-            breakAttributesAndDetermineAction(storageBuf, messageToForward, recBytes, version, type, length);
+            memset(messageToForward, 0, BUFFER_SIZE);
+
+            breakAttributesAndDetermineAction(storageBuf, &messageToForward, recBytes, version, type, length);
+
             if (type == JOIN)
             {
                 // do nothing and continue monitoring.
@@ -177,7 +179,13 @@ int main (int argc, char *argv[])
                 printf("Sending data to client (%d)\n", allConnections);
 
                 //int retVal = send(allConnections, storageBuf, strlen(storageBuf), 0);
-                int sendData = sendMessage(allConnections, VERSION, FWD, strlen(messageToForward), messageToForward);
+
+                //for (int i = 0; i < HEADER_LENGTH + messageToForward; i++) {
+                //    printf("%#x\n", messageToForward[i]);
+                //}
+
+                printf("%i\n", strlen(messageToForward));
+                int sendData = sendMessage(allConnections, VERSION, FWD, strlen(storageBuf), storageBuf);
 
                 if (retVal == -1)
                 {

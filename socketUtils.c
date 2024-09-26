@@ -16,6 +16,8 @@ void addAttribute(char* buff, uint16_t offset, uint16_t type, uint16_t length, c
     attributeHeader[2] = (length >> 8) & 0xff;
     attributeHeader[3] = length & 0xff;
 
+    //printf("%i, %i, %i\n", type, length, offset);
+
     if (offset + HEADER_LENGTH + length > BUFFER_SIZE) {
         printf("Buffer overflow\n");
         return;
@@ -23,6 +25,12 @@ void addAttribute(char* buff, uint16_t offset, uint16_t type, uint16_t length, c
 
     memcpy(buff + offset, attributeHeader, HEADER_LENGTH);
     memcpy(buff + offset + HEADER_LENGTH, payload, length);
+
+    printf("%i\n", &buff);
+
+    for (int i = 0; i < strlen(buff); i++) {
+        printf("addattribute: %#x\n", buff[i]);
+    }
 }
 
 int sendMessage(int socket, uint16_t version, uint16_t type, uint16_t length, const char *payload) {

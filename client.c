@@ -10,6 +10,7 @@
 #include <sys/select.h>
 
 #include "socketUtils.h"
+#include "sbcpProtocol.h"
 
 int main(int argc, char* argv[]) {
     // Verify number of arguments is correct and notify user if not correct
@@ -54,9 +55,9 @@ int main(int argc, char* argv[]) {
     printf("Successfully connected to server.\n");
 
     char usernameBuff[BUFFER_SIZE];
-    addAttribute(usernameBuff, 0, 2, strlen(username), username);
+    addAttribute(usernameBuff, 0, USERNAME, strlen(username), username);
 
-    int sendUsername = sendMessage(sock, 3, 2, HEADER_LENGTH + strlen(username), usernameBuff); 
+    int sendUsername = sendMessage(sock, VERSION, JOIN, HEADER_LENGTH + strlen(username), usernameBuff); 
     if (sendUsername == -1) {
         printf("Failed to send username\n");
         exit(EXIT_FAILURE);
@@ -90,7 +91,12 @@ int main(int argc, char* argv[]) {
                 exit(EXIT_SUCCESS);
             }
             message[bytes_received] = '\0'; // Null-terminate the string
-            printf("Message from server: %s\n", message);
+
+            char buff[BUFFER_SIZE];
+
+            breakAttributesAndDetermineAction(message, buff, strlen(message), version, type, length);
+
+            //printf("Message from server: %s\n", message);
         }
 
         // Check if there is user input
@@ -101,8 +107,8 @@ int main(int argc, char* argv[]) {
 
                 message[strlen(message) - 1] = '\0';
 
-                addAttribute(buff, 0, 2, strlen(username), username);
-                addAttribute(buff, strlen(username) + HEADER_LENGTH, 4, strlen(message), message);
+                addAttribute(buff, 0, USERNAME, strlen(username), username);
+                addAttribute(buff, strlen(username) + HEADER_LENGTH, MESSAGE, strlen(message), message);
 
                 int sendData = sendMessage(sock, 3, 4, 2*HEADER_LENGTH + strlen(username) + strlen(message), buff);
             }
