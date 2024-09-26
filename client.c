@@ -54,8 +54,9 @@ int main(int argc, char* argv[]) {
     printf("Successfully connected to server.\n");
 
     char usernameBuff[BUFFER_SIZE];
-    uint16_t userNameSize = addAttribute(usernameBuff, 0, 2, strlen(username), username);
-    int sendUsername = sendMessage(sock, 3, 2, strlen(usernameBuff), usernameBuff); 
+    addAttribute(usernameBuff, 0, 2, strlen(username), username);
+
+    int sendUsername = sendMessage(sock, 3, 2, HEADER_LENGTH + strlen(username), usernameBuff); 
     if (sendUsername == -1) {
         printf("Failed to send username\n");
         exit(EXIT_FAILURE);
@@ -92,16 +93,15 @@ int main(int argc, char* argv[]) {
         }
 
         // Check if there is user input
-        char buff[BUFFER_SIZE];
         if (FD_ISSET(STDIN_FILENO, &read_fds)) {
             if (fgets(message, sizeof(message), stdin) != NULL) {
                 // Remove newline character from input
-                //message[strcspn(message, "\n")] = '\0';
+                char buff[BUFFER_SIZE];
 
-                uint16_t userNameSize = addAttribute(buff, 0, 2, strlen(username), username);
-                uint16_t messageSize = addAttribute(buff, userNameSize + HEADER_LENGTH, 4, strlen(message), message);
+                addAttribute(buff, 0, 2, strlen(username), username);
+                addAttribute(buff, strlen(username) + HEADER_LENGTH, 4, strlen(message), message);
 
-                int sendData = sendMessage(sock, 3, 4, strlen(buff), buff);
+                int sendData = sendMessage(sock, 3, 4, 2*HEADER_LENGTH + strlen(username) + strlen(message), buff);
             }
         }
     }

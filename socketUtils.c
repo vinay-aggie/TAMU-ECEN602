@@ -8,27 +8,23 @@
 #include <string.h>
 
 
-uint16_t addAttribute(char* buff, uint16_t offset, uint16_t type, uint16_t length, const char* payload) {
+void addAttribute(char* buff, uint16_t offset, uint16_t type, uint16_t length, const char* payload) {
     uint8_t attributeHeader[HEADER_LENGTH];
 
     attributeHeader[0] = (type >> 8) & 0xff;
     attributeHeader[1] = type & 0xff;
-    attributeHeader[2] = (strlen(payload) >> 8) & 0xff;
-    attributeHeader[3] = strlen(payload) & 0xff;
+    attributeHeader[2] = (length >> 8) & 0xff;
+    attributeHeader[3] = length & 0xff;
 
-    if (offset + HEADER_LENGTH + strlen(payload) > BUFFER_SIZE) {
+    if (offset + HEADER_LENGTH + length > BUFFER_SIZE) {
         printf("Buffer overflow\n");
-        return -1;
+        return;
     }
 
     memcpy(buff + offset, attributeHeader, HEADER_LENGTH);
-    memcpy(buff + offset + HEADER_LENGTH, payload, strlen(payload));
+    memcpy(buff + offset + HEADER_LENGTH, payload, length);
 
-    for (int i = 0; i < HEADER_LENGTH + strlen(payload); i++) {
-        printf("%#x\n", buff[offset + i]);
-    }
-
-    return HEADER_LENGTH + strlen(payload);
+    printf("Howdy\n");
 }
 
 int sendMessage(int socket, uint16_t version, uint16_t type, uint16_t length, const char *payload) {
@@ -39,12 +35,12 @@ int sendMessage(int socket, uint16_t version, uint16_t type, uint16_t length, co
     header[2] = length >> 8;
     header[3] = length & 0xFF;
 
-    size_t packet_size = HEADER_LENGTH + strlen(payload);
+    size_t packet_size = HEADER_LENGTH + length;
 
     unsigned char* message = malloc(packet_size);
 
     memcpy(message, header, HEADER_LENGTH);
-    memcpy(message + HEADER_LENGTH, payload, strlen(payload));
+    memcpy(message + HEADER_LENGTH, payload, length);
 
     ssize_t bytes_sent = send(socket, message, packet_size, 0);
     
@@ -55,7 +51,7 @@ int receiveMessage(int fd, char *buf, int buf_size)
 {
     char tempBuff[BUFFER_SIZE];
 
-    int recBytes = read(fd, tempBuff, tempBuff);
+    int recBytes = read(fd, tempBuff, strlen(tempBuff));
     if (recBytes == -1)
     {
         printf("Failed to read data from socket! Error = {%s}\n", strerror(errno));
