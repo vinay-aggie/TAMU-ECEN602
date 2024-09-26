@@ -22,6 +22,13 @@
 
 #define MAX_CONNECTIONS 100
 
+#define USERNAME 2
+#define MESSAGE 4
+#define REASON 1
+#define CLIENT_COUNT 3
+
+uint16_t addAttribute(char* buff, uint16_t offset, uint16_t type, uint16_t length, const char* payload);
+
 int sendMessage(int socket, uint16_t version, uint16_t type, uint16_t length, const char *payload);
 
 int receiveMessage(int fd, char *buf, int buf_size);

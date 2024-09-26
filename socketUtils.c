@@ -5,7 +5,31 @@
 #include <unistd.h>
 #include <sys/socket.h>
 #include <stdlib.h>
+#include <string.h>
 
+
+uint16_t addAttribute(char* buff, uint16_t offset, uint16_t type, uint16_t length, const char* payload) {
+    uint8_t attributeHeader[HEADER_LENGTH];
+
+    attributeHeader[0] = (type >> 8) & 0xff;
+    attributeHeader[1] = type & 0xff;
+    attributeHeader[2] = (strlen(payload) >> 8) & 0xff;
+    attributeHeader[3] = strlen(payload) & 0xff;
+
+    if (offset + HEADER_LENGTH + strlen(payload) > BUFFER_SIZE) {
+        printf("Buffer overflow\n");
+        return -1;
+    }
+
+    memcpy(buff + offset, attributeHeader, HEADER_LENGTH);
+    memcpy(buff + offset + HEADER_LENGTH, payload, strlen(payload));
+
+    for (int i = 0; i < HEADER_LENGTH + strlen(payload); i++) {
+        printf("%#x\n", buff[offset + i]);
+    }
+
+    return HEADER_LENGTH + strlen(payload);
+}
 
 int sendMessage(int socket, uint16_t version, uint16_t type, uint16_t length, const char *payload) {
     uint8_t header[HEADER_LENGTH];
