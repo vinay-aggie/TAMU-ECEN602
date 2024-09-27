@@ -8,22 +8,6 @@
 
 #include "socketUtils.h"
 
-/*
-enum headerTypes
-{
-    Join = 2,
-    Send = 4,
-    Fwd = 3,
-};
-
-enum attributeTypes
-{
-    Username = 2,
-    Message  = 4,
-    Reason = 1,
-    ClientCount  = 3,
-};*/
-
 struct sbcpAttribute
 {
     uint16_t type;
@@ -39,9 +23,38 @@ struct sbcpPacket
     struct sbcpAttribute *attr;
 };
 
-char usernames[MAX_CONNECTIONS][16] = {0};
+#define MAX_CLIENT_COUNT 3
 
-void breakAttributesAndDetermineAction(char *readBuf, char *writeBuf, uint16_t totalSize, uint16_t version, uint16_t type, uint16_t sbcpRemLength)
+static char usernames[MAX_CLIENT_COUNT][16] = {0};
+
+static int currentClientCount  = 0;
+
+int checkIfUserExists(char *buf) 
+{
+    for (int i = 0; i < MAX_CLIENT_COUNT; i++) 
+    { 
+        if (strcmp(buf, usernames[i]) == 0) 
+        {
+            printf("Username already exists! Take another one!\n"); 
+            return 1;
+        }
+    }
+    return 0; 
+}
+
+void addUserToDB(char *buf)
+{
+    for (int i = 0; i < MAX_CLIENT_COUNT; i++) 
+    { 
+        if (strcmp(usernames[i], "") == 0)
+        {
+            strcpy(usernames[i], buf);
+        }
+    }
+}
+
+
+int breakAttributesAndDetermineAction(char *readBuf, char *writeBuf, uint16_t totalSize, uint16_t version, uint16_t type, uint16_t sbcpRemLength)
 {
     char sbcpAttributes[BUFFER_SIZE];
     memcpy(sbcpAttributes, readBuf, totalSize);
@@ -76,9 +89,22 @@ void breakAttributesAndDetermineAction(char *readBuf, char *writeBuf, uint16_t t
     switch (type)
     {
         case JOIN:
-            // check if user exists.
+            if (checkIfUserExists(sbcpPacket[0]) == 1)
+            {
+                printf("Please choose another user name. {%s} is already taken.\n", sbcpPacket[0]);
+                return 1;
+            }
+            currentClientCount ++;
+            if (currentClientCount > MAX_CLIENT_COUNT)
+            {
+                printf("Server has reached maximum capacity. You cannot join!\n");
+                currentClientCount -- ;
+                return 1;
+            }
+
             printf("New user has joined the chat!\n");
-            printf("User: %s\n", sbcpPacket);
+            printf("User: %s\n", sbcpPacket[0]);
+            addUserToDB(sbcpPacket[0]);
             // break here since we don't care even if there is a message.
             break;
 
@@ -93,6 +119,8 @@ void breakAttributesAndDetermineAction(char *readBuf, char *writeBuf, uint16_t t
         case FWD:
             printf("Message from %s: %s\n", sbcpPacket[0], sbcpPacket[1]);
         }
+
+    return 0;
 }
 
 #endif /* SBCP_PROTOCOL_H */

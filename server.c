@@ -151,7 +151,13 @@ int main (int argc, char *argv[])
 
             memset(messageToForward, 0, BUFFER_SIZE);
 
-            breakAttributesAndDetermineAction(storageBuf, &messageToForward, recBytes, version, type, length);
+            int retFunc = breakAttributesAndDetermineAction(storageBuf, &messageToForward, recBytes, version, type, length);
+            if (retFunc == 1)
+            {
+                close(descriptor);
+                FD_CLR(descriptor, &masterListFds);
+                continue;
+            }
 
             if (type == JOIN)
             {
