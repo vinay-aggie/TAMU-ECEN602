@@ -1,15 +1,6 @@
 # ECEN-602-Machine-Problems
 
 ## ECEN 602 Network Programming Assignment 2
-### TCP Simple Broadcast Chat Server and Client
-
-## Benjamin Alcorn 628002952
-## Vinay Balamurali 936002032
-
-
-# ECEN-602-Machine-Problems
-
-## ECEN 602 Network Programming Assignment 2
 ## TCP Simple Broadcast Chat Server and Client
 
 ## Team 2
