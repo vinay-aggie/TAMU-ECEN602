@@ -94,7 +94,7 @@ int main(int argc, char* argv[]) {
 
             char buff[BUFFER_SIZE];
 
-            breakAttributesAndDetermineAction(message, buff, strlen(message), version, type, length);
+            breakAttributesAndDetermineAction(message, buff, length, version, type, length);
 
             //printf("Message from server: %s\n", message);
         }

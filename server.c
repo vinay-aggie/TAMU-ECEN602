@@ -138,6 +138,7 @@ int main (int argc, char *argv[])
             //int recBytes = read(descriptor, storageBuf, BUFFER_SIZE);
             uint16_t version, type, length;
             ssize_t recBytes = receiveMessage(descriptor, storageBuf, &version, &type, &length);
+
             if (retVal == -1)
             {
                 printf("Failed to read data from socket! Closing connection!\n");
@@ -157,40 +158,35 @@ int main (int argc, char *argv[])
                 // do nothing and continue monitoring.
                 printf("Acnowledged user joined!\n");
                 continue;
-            }
-            // otherwise fwd message.
+            } else if (type == SEND) {
+                // otherwise fwd message.
 
-            // send to all other connections!
-            for (int allConnections = 0; allConnections <= MaxFd; allConnections++)
-            {
-                if (FD_ISSET(allConnections, &masterListFds) == 0)
+                // send to all other connections!
+                for (int allConnections = 0; allConnections <= MaxFd; allConnections++)
                 {
-                    // Don't send data to non-existant file descriptors.
-                    continue;
-                }
+                    if (FD_ISSET(allConnections, &masterListFds) == 0)
+                    {
+                        // Don't send data to non-existant file descriptors.
+                        continue;
+                    }
 
-                // Don't send data to listening socket as well as the client
-                // from which we received data.
-                if ((allConnections == serverSocketFd) || (allConnections == descriptor))
-                {
-                    continue;
-                }
+                    // Don't send data to listening socket as well as the client
+                    // from which we received data.
+                    if ((allConnections == serverSocketFd) || (allConnections == descriptor))
+                    {
+                        continue;
+                    }
 
-                printf("Sending data to client (%d)\n", allConnections);
+                    printf("Sending data to client (%d)\n", allConnections);
 
-                //int retVal = send(allConnections, storageBuf, strlen(storageBuf), 0);
+                    //int retVal = send(allConnections, storageBuf, strlen(storageBuf), 0);
 
-                //for (int i = 0; i < HEADER_LENGTH + messageToForward; i++) {
-                //    printf("%#x\n", messageToForward[i]);
-                //}
-
-                printf("%i\n", strlen(messageToForward));
-                int sendData = sendMessage(allConnections, VERSION, FWD, strlen(storageBuf), storageBuf);
-
-                if (retVal == -1)
-                {
-                    printf("Failed to establish a connection with the client! clientSocketFd = [%d] Error = {%s}\n",
-                            allConnections, strerror(errno));
+                
+                    int sendData = sendMessage(allConnections, VERSION, FWD, length, storageBuf);
+                    if (sendData == -1)
+                    {
+                        printf("Failed to establish a connection with the client! clientSocketFd = [%d] Error = {%s}\n", allConnections, strerror(errno));
+                    }
                 }
             }
             printf("Finished sending data\n");

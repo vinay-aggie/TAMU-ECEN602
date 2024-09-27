@@ -49,16 +49,26 @@ void breakAttributesAndDetermineAction(char *readBuf, char *writeBuf, uint16_t t
     int offset = 0;
     int counter = 0;
     char sbcpPacket[2][BUFFER_SIZE];
-    memset(sbcpPacket, 0 ,sizeof(sbcpPacket));
+    int offsets[2] = {0,0};
+    memset(sbcpPacket, 0, totalSize);
     while (offset < sbcpRemLength)
     {
+        char temp[BUFFER_SIZE];
         printf("Printing packet!\n");
         uint16_t attrType;
         uint16_t attrLength;
-        readAttribute(sbcpAttributes, sbcpPacket[counter], offset, &attrType, &attrLength);
+        readAttribute(sbcpAttributes, temp, offset, &attrType, &attrLength);
+
+        if (attrType == USERNAME) {
+            memcpy(sbcpPacket[0] + offsets[0], temp, attrLength);
+            offsets[0] += attrLength;
+        } else if (attrType == MESSAGE) {
+            memcpy(sbcpPacket[1] + offsets[1], temp, attrLength);
+            offsets[1] += attrLength;
+        }
         printf("type = (%d), length = (%d)\n", attrType, attrLength);
         sbcpPacket[counter][attrLength] = '\0';
-        printf("Attribute 1 has payload : (%s)\n", sbcpPacket[counter]);
+        printf("Attribute {%i} has payload : (%s)\n", counter, sbcpPacket[counter]);
         offset = offset + HEADER_LENGTH + attrLength;
         counter++;
     }
@@ -73,25 +83,16 @@ void breakAttributesAndDetermineAction(char *readBuf, char *writeBuf, uint16_t t
             break;
 
         case SEND:
-            printf("Forwarding message from User {%s} to all other users.\n");
-            addAttribute(writeBuf, 0, USERNAME, strlen(sbcpPacket[0]), sbcpPacket[0]);
-            addAttribute(writeBuf, HEADER_LENGTH + strlen(sbcpPacket[0]), MESSAGE, strlen(sbcpPacket[1]), sbcpPacket[1]);
+            printf("Forwarding message from User {%s} to all other users.\n", sbcpPacket[0]);
+
+            addAttribute(writeBuf, 0, USERNAME, offsets[0], sbcpPacket[0]);
+            addAttribute(writeBuf, HEADER_LENGTH + offsets[0], MESSAGE, offsets[1], sbcpPacket[1]);
+
             break;
+
+        case FWD:
+            printf("Message from %s: %s\n", sbcpPacket[0], sbcpPacket[1]);
         }
 }
-/*
-struct sbcpUsernamePacket
-{
-    uint16_t type;
-
-}
-
-struct sbcpProtocol
-{
-    uint16_t version;
-    uint16_t type;
-    uint16_t length;
-    struct sbcpAttributePacket[] payload;
-};*/
 
 #endif /* SBCP_PROTOCOL_H */
