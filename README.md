@@ -3,6 +3,9 @@
 ## ECEN 602 Network Programming Assignment 2
 ### TCP Simple Broadcast Chat Server and Client
 
+## Benjamin Alcorn 628002952
+## Vinay Balamurali 936002032
+
 Test case 1: Normal operation of the chat client with three clients connected
 
 This was tested by starting the server, connecting three clients and then each client sent a welcome message to be received by all other clients. Below is the resulting terminal output after running the scripts and giving messages to each client. 
