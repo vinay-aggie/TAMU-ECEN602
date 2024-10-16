@@ -342,11 +342,11 @@ int main (int argc, char *argv[])
         // Receive a message from the client
         ssize_t recBytes = recvfrom(serverSocketFd, recBuf, BUFFER_SIZE, 0, (struct sockaddr *)&clientAddr, &clientAddrLen);
         if (recBytes < 0)
-        {
+        { 
             printf("Failed to read data from socket! Error = {%s}\n", strerror(errno));
             continue;
         }
-        
+            
         char clientIP[INET_ADDRSTRLEN];
         inet_ntop(AF_INET, &clientAddr.sin_addr, clientIP, INET_ADDRSTRLEN);
         printf("Established connecttion with client having IP: (%s) \n", clientIP);
