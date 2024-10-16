@@ -92,6 +92,7 @@ void sendErrorMessage(unsigned int errorCode, char *errMsg, int sockfd, struct s
 
 
 // Method to handle a RRQ from the client.
+// Used to fetch files from server's directory.
 void handleReadRequest(int origSockFd, char *fileName, char *modeOfOperation, struct sockaddr_in *clientAddr, socklen_t clientAddrLen)
 {
     struct sockaddr_in ephemeralAddr;
@@ -280,6 +281,8 @@ void handleReadRequest(int origSockFd, char *fileName, char *modeOfOperation, st
     return;
 }
 
+// Method to handle a WRQ from the client.
+// Used to store files in server's directory.
 void handleWriteRequest(int origSockFd, char *fileName, char *modeOfOperation, struct sockaddr_in *clientAddr, socklen_t clientAddrLen, int clientPort)
 {
     char sendBuf[ACK_SIZE];
@@ -321,8 +324,8 @@ void handleWriteRequest(int origSockFd, char *fileName, char *modeOfOperation, s
             printf("Fail to receive\n");
         }
 
-        int recOp = (recBuff[0] << 8) | recBuff[1] & 0xFF;
-        unsigned int recNum = (recBuff[2] << 8) | recBuff[3] & 0xFF;
+        int recOp = (recBuff[0] << 8) | (recBuff[1] & 0xFF);
+        unsigned int recNum = (recBuff[2] << 8) | (recBuff[3] & 0xFF);
 
         printf("Data opcode = (%d)\n", recOp);
         printf("Data Number = (%d)\n", recNum);
@@ -454,7 +457,7 @@ int main (int argc, char *argv[])
         // child.
         unsigned char opCode = recBuf[1];
 
-
+        // Handle RRQ request.
         if (opCode == TFTP_RRQ) {
             char *fileName =  recBuf + 2;
             printf("File to retrieve: {%s}\n", fileName);
@@ -465,7 +468,7 @@ int main (int argc, char *argv[])
             printf("Handling Read Request!\n");
             handleReadRequest(serverSocketFd, fileName, mode, &clientAddr, clientAddrLen);
             exit(0);
-        } else if (opCode == TFTP_WRQ) {
+        } else if (opCode == TFTP_WRQ) { // Handle WRQ Request.
             char *fileName =  recBuf + 2;
             printf("File Name is: (%s)\n", fileName);
             size_t fileLen = strlen(fileName);
