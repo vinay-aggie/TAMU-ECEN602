@@ -12,6 +12,7 @@
 // const definitions.
 #define BUFFER_SIZE 516
 #define DATA_SIZE 512
+#define ACK_SIZE 4
 
 
 // TFTP protocol.
@@ -273,7 +274,80 @@ void handleReadRequest(int origSockFd, char *fileName, char *modeOfOperation, st
     return;
 }
 
+void handleWriteRequest(int origSockFd, char *fileName, char *modeOfOperation, struct sockaddr_in *clientAddr, socklen_t clientAddrLen, int clientPort)
+{
+    char sendBuf[ACK_SIZE];
+    memset(sendBuf, 0, ACK_SIZE);
 
+    FILE *filePtr;
+    int modeOp;
+    if (strcasecmp(modeOfOperation, "netascii") == 0)
+    {
+        modeOp = ASCII_MODE;
+        filePtr = fopen(fileName, "w");
+    }
+    else if (strcasecmp(modeOfOperation, "octet") == 0)
+    {
+        modeOp = BINARY_MODE;
+        filePtr = fopen(fileName, "wb");
+    }
+    else
+    {
+        modeOp = UNKNOWN_MODE;
+        printf("Unknown mode in WRQ packet!\n");
+        char *errMsg = "Undefined mode of operation";
+        sendErrorMessage(ERR_NOT_DEFINED, errMsg, origSockFd, clientAddr, clientAddrLen);
+        return;
+    }
+
+    char recBuff[BUFFER_SIZE];
+    while (1)
+    {
+        memset(recBuff, 0, BUFFER_SIZE);
+        if (setTimeout(origSockFd, 5) == 0) {
+            fclose(filePtr);
+            return;
+        }
+
+        int recBytes = recvfrom(origSockFd, recBuff, BUFFER_SIZE, 0, (struct sockaddr *)clientAddr, &clientAddrLen);
+
+        if (recBytes < 0) {
+            printf("Fail to receive\n");
+        }
+
+        int recOp = (recBuff[0] << 8) | recBuff[1] & 0xFF;
+        unsigned int recNum = (recBuff[2] << 8) | recBuff[3] & 0xFF;
+
+        printf("Data opcode = (%d)\n", recOp);
+        printf("Data Number = (%d)\n", recNum);
+
+        if (modeOp == ASCII_MODE) {
+            fwrite(recBuff + 4, 1, recBytes - 4, filePtr);
+        } else if (modeOp == BINARY_MODE) {
+            fwrite(recBuff + 4, 1, recBytes - 4, filePtr);
+        }
+
+        sendBuf[0] = TFTP_ACK >> 8;
+        sendBuf[1] = TFTP_ACK & 0xFF;
+        sendBuf[2] = (recNum >> 8) & 0xFF;
+        sendBuf[3] = recNum & 0xFF;
+
+        for (int i = 0; i < ACK_SIZE; i++) {
+            printf("Buff %i: %02x\n", i, sendBuf[i]);
+        }
+
+        if (sendto(origSockFd, sendBuf, ACK_SIZE, 0, (struct sockaddr *)clientAddr, clientAddrLen) < 0)
+        {
+            printf("Some error handling for sendto!\n");
+            break;
+        }
+    }
+
+    printf("Done sending file!\n");
+
+    fclose(filePtr);
+    return;
+}
 
 
 int main (int argc, char *argv[])
@@ -373,20 +447,70 @@ int main (int argc, char *argv[])
         // Handle client data.
         // child.
         unsigned char opCode = recBuf[1];
-        if (opCode != TFTP_RRQ)
-        {
-            printf("The request is not TFTP Read Request. Cannot process! Exiting\n");
+
+
+        if (opCode == TFTP_RRQ) {
+            char *fileName =  recBuf + 2;
+            printf("File to retrieve: {%s}\n", fileName);
+            size_t fileLen = strlen(fileName);
+            char *mode = recBuf + 2 + (fileLen + 1);
+            printf("Mode of Operation: {%s}\n", mode);
+
+            printf("Handling Read Request!\n");
+            handleReadRequest(serverSocketFd, fileName, mode, &clientAddr, clientAddrLen);
+            exit(0);
+        } else if (opCode == TFTP_WRQ) {
+            char *fileName =  recBuf + 2;
+            printf("File Name is: (%s)\n", fileName);
+            size_t fileLen = strlen(fileName);
+            printf("File length is: (%zu)\n", fileLen);
+            char *mode = recBuf + 2 + (fileLen + 1);
+            printf("Mode is: {%s}\n", mode);
+
+            char ackBuf[ACK_SIZE];
+
+            ackBuf[0] = 0;
+            ackBuf[1] = TFTP_ACK;
+            ackBuf[2] = 0;
+            ackBuf[3] = 0;
+
+            struct sockaddr_in ephemeralAddr;
+
+            ephemeralAddr.sin_family = AF_INET;
+            ephemeralAddr.sin_port = htons(rand());
+            ephemeralAddr.sin_addr.s_addr = INADDR_ANY;
+
+            int newSockFd = socket(AF_INET, SOCK_DGRAM, 0);
+            if (newSockFd < 0)
+            {
+                printf("Failed to create socket! newSockFd = [%d] Error = {%s}\n", newSockFd, strerror(errno));
+                exit(EXIT_FAILURE);
+            }
+
+            int retVal = bind(newSockFd, (struct sockaddr*)&ephemeralAddr, sizeof(ephemeralAddr));
+            if (retVal < 0)
+            {
+                printf("Failed to bind socket! retVal = [%d] Error = {%s}\n", retVal, strerror(errno));
+                close(newSockFd);
+                exit(EXIT_FAILURE);
+            }
+
+            if (sendto(newSockFd, ackBuf, ACK_SIZE, 0, (struct sockaddr*)&clientAddr, clientAddrLen) < 0) {
+                printf("Failed to send ack\n");
+            }
+
+            int clientPort = ntohs(ephemeralAddr.sin_port);
+            printf("%i\n", clientPort);
+
+            handleWriteRequest(newSockFd, fileName, mode, &clientAddr, clientAddrLen, clientPort);
+
+            close(newSockFd);
+
+            exit(0);
+        } else {
+            printf("This request is invalid\n");
             exit(EXIT_FAILURE);
         }
-        char *fileName =  recBuf + 2;
-        printf("File to retrieve: {%s}\n", fileName);
-        size_t fileLen = strlen(fileName);
-        char *mode = recBuf + 2 + (fileLen + 1);
-        printf("Mode of Operation: {%s}\n", mode);
-
-        printf("Handling Read Request!\n");
-        handleReadRequest(serverSocketFd, fileName, mode, &clientAddr, clientAddrLen);
-        exit(0);
     }
 
     return 0;
