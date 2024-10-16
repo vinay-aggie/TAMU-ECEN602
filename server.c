@@ -7,6 +7,7 @@
 #include <sys/socket.h>
 #include <arpa/inet.h>
 #include <netinet/in.h>
+#include <signal.h>
 
 // const definitions.
 #define BUFFER_SIZE 516
@@ -22,12 +23,28 @@
 
 
 
-#define ASCII_MODE  1
-#define BINARY_MODE 2
+#define ASCII_MODE    1
+#define BINARY_MODE   2
+#define UNKNOWN_MODE  3
 
 
 #define ERR_NOT_DEFINED      0
 #define ERR_FILE_NOT_FOUND   1
+
+
+// ref: Beej's guide.
+void reapChildZombies(int s)
+{
+    // waitpid() might overwrite errno, so we save and restore it:
+    int saved_errno = errno;
+    int pid;
+    while ((pid =  waitpid(-1, NULL, WNOHANG)) > 0)
+    {
+        printf("Reaped child process (%d)\n", pid);
+    }
+
+    errno = saved_errno;
+}
 
 
 int setTimeout(int fileDesc, int timeInSec)
@@ -51,13 +68,16 @@ void sendErrorMessage(unsigned int errorCode, char *errMsg, int sockfd, struct s
 
     errBuf[0] = 0;
     errBuf[1] = 5;
-    errBuf[2] = 0;
-    errBuf[3] = 4;
-    //errBuf[2] = (errorCode >> 8) & 0xFF;
-    //errBuf[3] = errorCode & 0xFF;
+    errBuf[2] = (errorCode >> 8) & 0xFF;
+    errBuf[3] = errorCode & 0xFF;
 
     memcpy(errBuf + 4, errMsg, strlen(errMsg) + 1);
-    size_t errBufLen = 2 + 2 + strlen(errBuf) + 1;
+
+    size_t errBufLen = 2 + 2 + strlen(errMsg) + 1;
+    /*
+    for (int i = 0; i <= errBufLen; i++) {
+        printf("{0x%02X}\n", errBuf[i]);
+    }*/
 
     if (sendto(sockfd, errBuf, errBufLen, 0, (struct sockaddr *)clientAddr, clientAddrLen) < 0)
     {
@@ -92,40 +112,95 @@ void handleReadRequest(int origSockFd, char *fileName, char *modeOfOperation, st
     }
 
     FILE *filePtr;
+    int modeOp;
     if (strcasecmp(modeOfOperation, "netascii"))
     {
+        modeOp = ASCII_MODE;
         filePtr = fopen(fileName, "r");
     }
     else if (strcasecmp(modeOfOperation, "octet"))
     {
+        modeOp = BINARY_MODE;
         filePtr = fopen(fileName, "rb");
     }
     else
     {
+        modeOp = UNKNOWN_MODE;
         printf("Unknown mode in RRQ packet!\n");
-        char *msg = "Undefined mode of operation";
-        sendErrorMessage(ERR_NOT_DEFINED, msg, origSockFd, clientAddr, clientAddrLen);
+        char *errMsg = "Undefined mode of operation";
+        sendErrorMessage(ERR_NOT_DEFINED, errMsg, origSockFd, clientAddr, clientAddrLen);
         return;
     }
 
     if (filePtr == NULL)
     {
-        printf("File not found in server! Error = (%s)\n", strerror(errno));
-        sendErrorMessage(ERR_FILE_NOT_FOUND, strerror(errno), origSockFd, clientAddr, clientAddrLen);
+        char *errMsg = strerror(errno);
+        printf("File not found in server! Error = (%s)\n", errMsg);
+        sendErrorMessage(ERR_FILE_NOT_FOUND, errMsg, origSockFd, clientAddr, clientAddrLen);
         return;
     }
 
     int packetNum = 1;
     char ackBuf[BUFFER_SIZE];
+    char nextChar = -1;
     while (1)
     {
+        // packet num wrap around
+        if (packetNum > 65535)
+        {
+            packetNum = 0;
+        } 
         memset(sendBuf, 0 , BUFFER_SIZE);
         sendBuf[0] = 0;
         sendBuf[1] = 3;
         sendBuf[2] = (packetNum >> 8) & 0xFF;
         sendBuf[3] = packetNum & 0xFF;
 
-        ssize_t bytesRead = fread(sendBuf + 4, 1, DATA_SIZE, filePtr);
+        char *ptr = sendBuf + 4;
+        ssize_t bytesRead = 0;
+        if (modeOp == ASCII_MODE)
+        {
+            ssize_t count = -1;
+            for (count = 0; count < DATA_SIZE; count ++)
+            {
+                if (nextChar >= 0)
+                {
+                    *ptr++ = nextChar;
+                    nextChar = -1;
+                    continue;
+                }
+
+                char currentChar = fgetc(filePtr);
+
+                if (currentChar == EOF)
+                {
+                    printf("Reached EOF! exit for loop\n");
+                    break;
+                }
+                else if (currentChar == '\n')
+                {
+                    currentChar = '\r';
+                    nextChar = '\n';
+                }
+                else if (currentChar == '\r')
+                {
+                    nextChar = '\0';
+                }
+                else
+                {
+                    nextChar = -1;
+                }
+
+                *ptr++ = currentChar;
+
+            }
+            bytesRead = count;
+        }
+        else if (modeOp == BINARY_MODE)
+        {
+            bytesRead = fread(sendBuf + 4, 1, DATA_SIZE, filePtr);
+        }
+
 
         if (sendto(newSockFd, sendBuf, bytesRead + 4, 0, (struct sockaddr *)clientAddr, clientAddrLen) < 0)
         {
@@ -151,10 +226,27 @@ void handleReadRequest(int origSockFd, char *fileName, char *modeOfOperation, st
             printf("Some error hanndling for recv!\n");
             break;
         }
+        int ackOp = ackBuf[1];
+        int ackNum = ((ackBuf[2] << 8) | ackBuf[3]);
+
+        printf("ACK opcode = (%d)\n", ackOp);
+        printf("ACK Number = (%d)\n", ackNum);
+        printf("Bytes read from file = (%zu)\n", bytesRead);
+        if ((ackOp == 4) && bytesRead < 512)
+        {
+            printf("Received last ACK. Transmission complete!\n");
+            break;
+        }
+
+        printf("Block Number is: (%d)\n", packetNum);
 
         packetNum++;
     }
 
+    printf("Done sending file!\n");
+
+    fclose(filePtr);
+    return;
 }
 
 
@@ -203,6 +295,18 @@ int main (int argc, char *argv[])
         close(serverSocketFd);
         exit(EXIT_FAILURE);
     }
+
+    // register signal handler to reap zombies.
+    struct sigaction sa;
+    sa.sa_handler = reapChildZombies; // reap all dead processes
+    sigemptyset(&sa.sa_mask);
+    sa.sa_flags = SA_RESTART;
+    if (sigaction(SIGCHLD, &sa, NULL) == -1)
+    {
+        printf("Failed to register signal handler to reap child processes! Error = {%s}\n", strerror(errno));
+        exit(EXIT_FAILURE);
+    }
+
     printf("Socket binding successfull.\n");
     printf("TFTP server listening for incoming connections...\n");
 
@@ -259,6 +363,7 @@ int main (int argc, char *argv[])
 
         printf("Handling Read Request!\n");
         handleReadRequest(serverSocketFd, fileName, mode, &clientAddr, clientAddrLen);
+        exit(0);
     }
 
     return 0;
