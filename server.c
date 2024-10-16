@@ -40,13 +40,17 @@ void reapChildZombies(int s)
     int pid;
     while ((pid =  waitpid(-1, NULL, WNOHANG)) > 0)
     {
-        printf("Reaped child process (%d)\n", pid);
+        printf("Reaped client handler: (%d)\n", pid);
     }
 
     errno = saved_errno;
 }
 
 
+// Set a timeout == timeInSec
+// If timouet expires without fileDesc set, then
+// return is 0, else positive.
+// Return -1 if select fails.
 int setTimeout(int fileDesc, int timeInSec)
 {
     fd_set rSet;
@@ -62,6 +66,7 @@ int setTimeout(int fileDesc, int timeInSec)
 }
 
 
+// Method to pack and send an error message.
 void sendErrorMessage(unsigned int errorCode, char *errMsg, int sockfd, struct sockaddr_in *clientAddr, socklen_t clientAddrLen)
 {
     char errBuf[BUFFER_SIZE];
@@ -74,10 +79,6 @@ void sendErrorMessage(unsigned int errorCode, char *errMsg, int sockfd, struct s
     memcpy(errBuf + 4, errMsg, strlen(errMsg) + 1);
 
     size_t errBufLen = 2 + 2 + strlen(errMsg) + 1;
-    /*
-    for (int i = 0; i <= errBufLen; i++) {
-        printf("{0x%02X}\n", errBuf[i]);
-    }*/
 
     if (sendto(sockfd, errBuf, errBufLen, 0, (struct sockaddr *)clientAddr, clientAddrLen) < 0)
     {
@@ -87,6 +88,7 @@ void sendErrorMessage(unsigned int errorCode, char *errMsg, int sockfd, struct s
 }
 
 
+// Method to handle a RRQ from the client.
 void handleReadRequest(int origSockFd, char *fileName, char *modeOfOperation, struct sockaddr_in *clientAddr, socklen_t clientAddrLen)
 {
     struct sockaddr_in ephemeralAddr;
@@ -132,8 +134,6 @@ void handleReadRequest(int origSockFd, char *fileName, char *modeOfOperation, st
         return;
     }
 
-    printf("%i\n", modeOp);
-
     if (filePtr == NULL)
     {
         char *errMsg = strerror(errno);
@@ -165,6 +165,7 @@ void handleReadRequest(int origSockFd, char *fileName, char *modeOfOperation, st
             printf("Working in ASCII mode\n");
 
             ssize_t count = -1;
+            // Ref: Unix network programming.
             for (count = 0; count < DATA_SIZE; count ++)
             {
                 if (nextChar >= 0)
@@ -178,7 +179,7 @@ void handleReadRequest(int origSockFd, char *fileName, char *modeOfOperation, st
 
                 if (currentChar == EOF)
                 {
-                    printf("Reached EOF! exit for loop\n");
+                    printf("Reached EOF! Finished reading file.\n");
                     break;
                 }
                 else if (currentChar == '\n')
@@ -202,7 +203,7 @@ void handleReadRequest(int origSockFd, char *fileName, char *modeOfOperation, st
         }
         else if (modeOp == BINARY_MODE)
         {
-            printf("Working in binary mode\n");
+            printf("Working in binary mode.\n");
 
             bytesRead = fread(sendBuf + 4, 1, DATA_SIZE, filePtr);
         }
@@ -214,30 +215,17 @@ void handleReadRequest(int origSockFd, char *fileName, char *modeOfOperation, st
             break;
         }
 
-        /*
-        int timeouts = 1;
-        while (timeouts <= 10)
-        {
-        }*/
-
         for (int i = 0; i < 10; i++) {
             if (setTimeout(newSockFd, 1) == 0) {
-                printf("Number of timeouts: %i\n", i + 1);
+                printf("Number of timeouts: (%i)\n", i + 1);
 
                 if (i == 9) {
                     printf("10 timeouts, closing handler\n");
-
                     fclose(filePtr);
                     return;
                 }
             }
         }
-
-        /*if (setTimeout(newSockFd, 1) == -1)
-        {
-            printf("Error in timeout. Returning!\n");
-            break;
-        }*/
 
         if (recvfrom(newSockFd, ackBuf, BUFFER_SIZE, 0, (struct sockaddr *)clientAddr, &clientAddrLen) < 0)
         {
@@ -373,11 +361,10 @@ int main (int argc, char *argv[])
             exit(EXIT_FAILURE);
         }
         char *fileName =  recBuf + 2;
-        printf("File Name is: (%s)\n", fileName);
+        printf("File to retrieve: {%s}\n", fileName);
         size_t fileLen = strlen(fileName);
-        printf("File length is: (%zu)\n", fileLen);
         char *mode = recBuf + 2 + (fileLen + 1);
-        printf("Mode is: {%s}\n", mode);
+        printf("Mode of Operation: {%s}\n", mode);
 
         printf("Handling Read Request!\n");
         handleReadRequest(serverSocketFd, fileName, mode, &clientAddr, clientAddrLen);
