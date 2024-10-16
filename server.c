@@ -23,12 +23,12 @@
 #define  TFTP_ERROR  5
 
 
-
+// MODES of OPERATION.
 #define ASCII_MODE    1
 #define BINARY_MODE   2
 #define UNKNOWN_MODE  3
 
-
+// TFTP ERROR CODES
 #define ERR_NOT_DEFINED      0
 #define ERR_FILE_NOT_FOUND   1
 
@@ -150,7 +150,6 @@ void handleReadRequest(int origSockFd, char *fileName, char *modeOfOperation, st
     char nextChar = -1;
     while (1)
     {
-        printf("Block Number is: (%d)\n", packetNum);
         // packet num wrap around
         if (packetNum > 65535)
         {
@@ -211,6 +210,11 @@ void handleReadRequest(int origSockFd, char *fileName, char *modeOfOperation, st
 
         printf("Bytes read from file = (%zu)\n", bytesRead);
 
+        if (bytesRead < 512)
+        {
+            printf("Sending final data packet with block no: (%d)!\n", packetNum);
+        }
+
         int retry = 0;
         while (retry < MAX_RETRIES)
         {
@@ -237,22 +241,16 @@ void handleReadRequest(int origSockFd, char *fileName, char *modeOfOperation, st
             }
 
             unsigned ackOp = ackBuf[1];
-            unsigned int ackNum = ((ackBuf[2] << 8) | ackBuf[3]);
+            unsigned int ackNum = ((ackBuf[2] << 8) | (ackBuf[3] & 0xFF));
 
             printf("ACK opcode = (%d)\n", ackOp);
             printf("ACK Number = (%d)\n", ackNum);
 
             if ((ackOp != TFTP_ACK))
             {
-                printf("Incorred ACK received! Send packet again\n");
+                printf("Incorrect ACK received! Send packet again\n");
                 retry ++;
                 continue;
-            }
-
-            if (bytesRead < 512)
-            {
-                printf("Received last ACK. Transmission complete!\n");
-                break;
             }
 
             break;
@@ -260,9 +258,17 @@ void handleReadRequest(int origSockFd, char *fileName, char *modeOfOperation, st
 
         if (retry ==  MAX_RETRIES)
         {
-            printf("10 timeouts occurred. Client not present. Disconnecting!\n");
-            fclose(filePtr);
-            return;
+            if (bytesRead < 512)
+            {
+                printf("Transmission successful!\n");
+                break;
+            }
+            else
+            {
+                printf("10 timeouts occurred. Client not present. Disconnecting!\n");
+                fclose(filePtr);
+                return;
+            }
         }
 
         packetNum++;
