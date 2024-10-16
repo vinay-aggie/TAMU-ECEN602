@@ -113,12 +113,12 @@ void handleReadRequest(int origSockFd, char *fileName, char *modeOfOperation, st
 
     FILE *filePtr;
     int modeOp;
-    if (strcasecmp(modeOfOperation, "netascii"))
+    if (strcasecmp(modeOfOperation, "netascii") == 0)
     {
         modeOp = ASCII_MODE;
         filePtr = fopen(fileName, "r");
     }
-    else if (strcasecmp(modeOfOperation, "octet"))
+    else if (strcasecmp(modeOfOperation, "octet") == 0)
     {
         modeOp = BINARY_MODE;
         filePtr = fopen(fileName, "rb");
@@ -131,6 +131,8 @@ void handleReadRequest(int origSockFd, char *fileName, char *modeOfOperation, st
         sendErrorMessage(ERR_NOT_DEFINED, errMsg, origSockFd, clientAddr, clientAddrLen);
         return;
     }
+
+    printf("%i\n", modeOp);
 
     if (filePtr == NULL)
     {
@@ -160,6 +162,8 @@ void handleReadRequest(int origSockFd, char *fileName, char *modeOfOperation, st
         ssize_t bytesRead = 0;
         if (modeOp == ASCII_MODE)
         {
+            printf("Working in ASCII mode\n");
+
             ssize_t count = -1;
             for (count = 0; count < DATA_SIZE; count ++)
             {
@@ -198,6 +202,8 @@ void handleReadRequest(int origSockFd, char *fileName, char *modeOfOperation, st
         }
         else if (modeOp == BINARY_MODE)
         {
+            printf("Working in binary mode\n");
+
             bytesRead = fread(sendBuf + 4, 1, DATA_SIZE, filePtr);
         }
 
@@ -214,12 +220,24 @@ void handleReadRequest(int origSockFd, char *fileName, char *modeOfOperation, st
         {
         }*/
 
-        // need to implement as a loop of 10 as mentioned in the problem statement.
-        if (setTimeout(newSockFd, 1) == -1)
+        for (int i = 0; i < 10; i++) {
+            if (setTimeout(newSockFd, 1) == 0) {
+                printf("Number of timeouts: %i\n", i + 1);
+
+                if (i == 9) {
+                    printf("10 timeouts, closing handler\n");
+
+                    fclose(filePtr);
+                    return;
+                }
+            }
+        }
+
+        /*if (setTimeout(newSockFd, 1) == -1)
         {
             printf("Error in timeout. Returning!\n");
             break;
-        }
+        }*/
 
         if (recvfrom(newSockFd, ackBuf, BUFFER_SIZE, 0, (struct sockaddr *)clientAddr, &clientAddrLen) < 0)
         {
