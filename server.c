@@ -32,6 +32,8 @@
 #define ERR_FILE_NOT_FOUND   1
 
 
+#define MAX_RETRIES    10
+
 // ref: Beej's guide.
 void reapChildZombies(int s)
 {
@@ -72,7 +74,7 @@ void sendErrorMessage(unsigned int errorCode, char *errMsg, int sockfd, struct s
     char errBuf[BUFFER_SIZE];
 
     errBuf[0] = 0;
-    errBuf[1] = 5;
+    errBuf[1] = TFTP_ERROR;
     errBuf[2] = (errorCode >> 8) & 0xFF;
     errBuf[3] = errorCode & 0xFF;
 
@@ -147,6 +149,7 @@ void handleReadRequest(int origSockFd, char *fileName, char *modeOfOperation, st
     char nextChar = -1;
     while (1)
     {
+        printf("Block Number is: (%d)\n", packetNum);
         // packet num wrap around
         if (packetNum > 65535)
         {
@@ -154,7 +157,7 @@ void handleReadRequest(int origSockFd, char *fileName, char *modeOfOperation, st
         } 
         memset(sendBuf, 0 , BUFFER_SIZE);
         sendBuf[0] = 0;
-        sendBuf[1] = 3;
+        sendBuf[1] = TFTP_DATA;
         sendBuf[2] = (packetNum >> 8) & 0xFF;
         sendBuf[3] = packetNum & 0xFF;
 
@@ -162,8 +165,6 @@ void handleReadRequest(int origSockFd, char *fileName, char *modeOfOperation, st
         ssize_t bytesRead = 0;
         if (modeOp == ASCII_MODE)
         {
-            printf("Working in ASCII mode\n");
-
             ssize_t count = -1;
             // Ref: Unix network programming.
             for (count = 0; count < DATA_SIZE; count ++)
@@ -180,6 +181,7 @@ void handleReadRequest(int origSockFd, char *fileName, char *modeOfOperation, st
                 if (currentChar == EOF)
                 {
                     printf("Reached EOF! Finished reading file.\n");
+                    bytesRead = count;
                     break;
                 }
                 else if (currentChar == '\n')
@@ -203,48 +205,64 @@ void handleReadRequest(int origSockFd, char *fileName, char *modeOfOperation, st
         }
         else if (modeOp == BINARY_MODE)
         {
-            printf("Working in binary mode.\n");
-
             bytesRead = fread(sendBuf + 4, 1, DATA_SIZE, filePtr);
         }
 
-
-        if (sendto(newSockFd, sendBuf, bytesRead + 4, 0, (struct sockaddr *)clientAddr, clientAddrLen) < 0)
-        {
-            printf("Some error handling for sendto!\n");
-            break;
-        }
-
-        for (int i = 0; i < 10; i++) {
-            if (setTimeout(newSockFd, 1) == 0) {
-                printf("Number of timeouts: (%i)\n", i + 1);
-
-                if (i == 9) {
-                    printf("10 timeouts, closing handler\n");
-                    fclose(filePtr);
-                    return;
-                }
-            }
-        }
-
-        if (recvfrom(newSockFd, ackBuf, BUFFER_SIZE, 0, (struct sockaddr *)clientAddr, &clientAddrLen) < 0)
-        {
-            printf("Some error hanndling for recv!\n");
-            break;
-        }
-        int ackOp = ackBuf[1];
-        int ackNum = ((ackBuf[2] << 8) | ackBuf[3]);
-
-        printf("ACK opcode = (%d)\n", ackOp);
-        printf("ACK Number = (%d)\n", ackNum);
         printf("Bytes read from file = (%zu)\n", bytesRead);
-        if ((ackOp == 4) && bytesRead < 512)
+
+        int retry = 0;
+        while (retry < MAX_RETRIES)
         {
-            printf("Received last ACK. Transmission complete!\n");
+            if (sendto(newSockFd, sendBuf, bytesRead + 4, 0, (struct sockaddr *)clientAddr, clientAddrLen) < 0)
+            {
+                printf("Failed to send TFTP data packet! Error = {%s}\n", strerror(errno));
+                retry ++;
+                continue;
+            }
+
+            int ret = setTimeout(newSockFd, 1);
+
+            if (ret <= 0)
+            {
+                printf("Timeout occurred. Sending data packet (%d) again! Timeout number: (%d)\n", packetNum, retry + 1);
+                retry ++;
+                continue;
+            }
+            if (recvfrom(newSockFd, ackBuf, BUFFER_SIZE, 0, (struct sockaddr *)clientAddr, &clientAddrLen) < 0)
+            {
+                printf("Failed to receive TFTP data packet! Error = {%s}\n", strerror(errno));
+                retry ++;
+                continue;
+            }
+
+            unsigned ackOp = ackBuf[1];
+            unsigned int ackNum = ((ackBuf[2] << 8) | ackBuf[3]);
+
+            printf("ACK opcode = (%d)\n", ackOp);
+            printf("ACK Number = (%d)\n", ackNum);
+
+            if ((ackOp != TFTP_ACK))
+            {
+                printf("Incorred ACK received! Send packet again\n");
+                retry ++;
+                continue;
+            }
+
+            if (bytesRead < 512)
+            {
+                printf("Received last ACK. Transmission complete!\n");
+                break;
+            }
+
             break;
         }
 
-        printf("Block Number is: (%d)\n", packetNum);
+        if (retry ==  MAX_RETRIES)
+        {
+            printf("10 timeouts occurred. Client not present. Disconnecting!\n");
+            fclose(filePtr);
+            return;
+        }
 
         packetNum++;
     }
