@@ -11,7 +11,7 @@
 ## Contributions
 
 #### BENJAMIN ALCORN:
-  * Development of WRQ handler
+  * Development of Bonus component --> WRQ handler
   * Testing.
 
 #### VINAY BALAMURALI:
