@@ -24,7 +24,6 @@
 const int MAX_CONNECTIONS = 100;
 const int BUFFER_SIZE = 4096;
 
-
 time_t parseHTTPDate(const std::string& httpDate)
 {
     std::tm tm = {};
@@ -40,7 +39,9 @@ time_t parseHTTPDate(const std::string& httpDate)
     // System will determine automatically.
     tm.tm_isdst = -1;
     return timegm(&tm);
-}
+
+} // parseHTTPDate
+
 
 
 http::retDateParse checkIfTimePassed(const std::string &httpTime)
@@ -52,7 +53,6 @@ http::retDateParse checkIfTimePassed(const std::string &httpTime)
     }
     catch (const std::runtime_error& e)
     {
-        printf("Failed to parse time specified in RFC. Error = {%s}\n", e.what());
         return http::retDateParse::FAILURE_TO_PARSE;
     }
 
@@ -61,13 +61,14 @@ http::retDateParse checkIfTimePassed(const std::string &httpTime)
 
     if (checkTime <= currentTime)
     {
-        printf("Time has passed.\n");
+        // Given time has elapsed.
         return http::retDateParse::TIME_UNIT_PASSED;
     }
 
-    printf("Time has not yet passed!\n");
+    // Time has not yet passed.
     return http::retDateParse::SUCCESS;
-}
+
+} // checkIfTimePassed
 
 
 
@@ -100,9 +101,6 @@ void parseHTTPresponse(const std::string &httpResponse, std::string &date,
     std::smatch match;
     std::regex regDate(datePattern);
 
-    printf("Reponse as string-->\n\n");
-    printf("{%s}\n", httpResponse.c_str());
-
     // Fetch Last accessed.
     if (std::regex_search(httpResponse, match, regDate))
     {
@@ -124,12 +122,40 @@ void parseHTTPresponse(const std::string &httpResponse, std::string &date,
     {
         expires = match.str(1).c_str();
     }
-}
+
+} // parseHTTPresponse
 
 
 
+// Method to parse the body from a Web Page.
+std::string parseHTTPBody(const std::string &httpResponse)
+{
+    size_t endOfHeader = httpResponse.find("\r\n\r\n");
+    if (endOfHeader == std::string::npos)
+    {
+        return {};
+    }
 
-// Function to connect to a web server using a hostname and port
+    // Body starts 4 chars after the postition.
+    // The de-limiter between Header and Body is ==> "\r\n\r\n"
+    std::string httpBody;
+    try
+    {
+        httpBody = httpResponse.substr(endOfHeader + 4);
+    }
+    catch (const std::out_of_range& e)
+    {
+        printf("Failed to fetch Body from Web Page. Error = {%s}\n", e.what());
+        return {};
+    }
+
+    return httpBody;
+
+} // parseHTTPBody
+
+
+
+// Method to connect to a web server using a hostname and port
 int connectToServer(const std::string& hostName, const std::string& port = "80")
 {
     // ref: Beej's Guide.
@@ -188,6 +214,8 @@ int connectToServer(const std::string& hostName, const std::string& port = "80")
 } // connectToServer
 
 
+
+// Method to to send and retrive data from the 'If-Modified-Since' request.
 std::string sendIfModifiedSinceRequest(const std::string &date, const http::httpHeader &header)
 {
     char ifModReq[256];
@@ -201,9 +229,10 @@ std::string sendIfModifiedSinceRequest(const std::string &date, const http::http
         printf("Failed to connect establish connection to server!\n");
         return {};
     }
-    snprintf(ifModReq, sizeof(ifModReq), "GET %s HTTP/1.0\r\nHost: %s\r\nIf-Modified-Since: %s\r\n\r\n",
+    snprintf(ifModReq, sizeof(ifModReq), "GET %s HTTP/1.0\r\nHost: %s\r\n\r\nIf-Modified-Since: %s\r\n\r\n",
              header.filePath.c_str(), header.hostName.c_str(), date.c_str());
     
+    printf("\nSending 'If-Modified-Since' request\n");
     // Send new request.
     if (send(newSockFd, ifModReq, sizeof(ifModReq), 0) == -1)
     {
@@ -218,9 +247,12 @@ std::string sendIfModifiedSinceRequest(const std::string &date, const http::http
     }
 
     return responseBuffer;
-}
+
+} // sendIfModifiedSinceRequest
 
 
+
+// Method to add and remove elements from the LRU cache.
 http::httpHeader handleCache(const http::httpHeader &header, http::LRUCache *cache)
 {
     std::string key = header.hostName + header.filePath;
@@ -231,23 +263,20 @@ http::httpHeader handleCache(const http::httpHeader &header, http::LRUCache *cac
     }
     catch (const std::runtime_error &e)
     {
-        printf("Error = {%s}. Adding to cache.\n", e.what());
+        printf("Cache Miss!\n");
+        printf("%s. Adding Web Page to cache.\n", e.what());
         cache->add(key, header);
-        cache->display();
         return header;
     }
 
-    printf("Printing fetched header\n\n");
-    printf("Expires: {%s}\n", fetchedHeader.expires.c_str());
-    printf("Last Modified: {%s}\n", fetchedHeader.lastModified.c_str());
-    printf("Last Accessed: {%s}\n", fetchedHeader.lastAccessTime.c_str());
+    printf("\n\nCache hit! Further processing required to determine validity of Web Page.\n\n");
 
     // Element is in cache. So we need to check if the
     // data is stale or not. Loop over each of the dates to
     // check if we get an apppropriate match.
     int priority = 1;
     bool exitLoop = false;
-    std::string date;
+    std::string requestDate;
     while (priority <= 3)
     {
         switch (priority)
@@ -255,7 +284,7 @@ http::httpHeader handleCache(const http::httpHeader &header, http::LRUCache *cac
             case 1:
                 if (checkIfTimePassed(header.expires) == http::retDateParse::SUCCESS)
                 {
-                    date = header.expires;
+                    requestDate = header.expires;
                     exitLoop = true;
                 }
                 break;
@@ -266,16 +295,16 @@ http::httpHeader handleCache(const http::httpHeader &header, http::LRUCache *cac
                 // 'Expires' header.
                 if (checkIfTimePassed(header.lastModified) != http::retDateParse::FAILURE_TO_PARSE)
                 {
-                    date = header.lastModified;
+                    requestDate = header.lastModified;
                     exitLoop = true;
                 }
                 break;
 
             case 3:
-                // Follow same logic in Case 3 as Case 2.
+                // Follow same logic in Case 3 as in Case 2.
                 if (checkIfTimePassed(header.lastAccessTime) != http::retDateParse::FAILURE_TO_PARSE)
                 {
-                    date = header.lastAccessTime;
+                    requestDate = header.lastAccessTime;
                     exitLoop = true;
                 }
                 break;
@@ -287,7 +316,6 @@ http::httpHeader handleCache(const http::httpHeader &header, http::LRUCache *cac
 
         if (exitLoop)
         {
-            printf("Found a valid date at priority: (%d)\n", priority);
             break;
         }
 
@@ -303,10 +331,41 @@ http::httpHeader handleCache(const http::httpHeader &header, http::LRUCache *cac
 
     // If execution reaches this point, we need to
     // send an If Modified request to the server.
-    std::string newResponse = sendIfModifiedSinceRequest(date, fetchedHeader);
-    
-    return {};
-}
+    std::string newResponse = sendIfModifiedSinceRequest(requestDate, fetchedHeader);
+    if (newResponse.empty())
+    {
+        printf("Failed to retrieve response after sending 'If-Modified-Since' request.\n");
+        printf("Serving outdated Web page present in cache...\n");
+        printf("Warning: Page may have been modified since last access. Use at your own discretion!\n");
+        return fetchedHeader;
+    }
+
+    std::string date, lastModified, expires;
+    http::httpHeader updatedHeader;
+    parseHTTPresponse(newResponse, date, lastModified, expires);
+
+    newResponse = parseHTTPBody(newResponse);
+    if (newResponse.empty())
+    {
+        printf("Cannot serve Web page to client. Failure to ascertain body of the Web Page.\n");
+        printf("Serving outdated Web page present in cache...\n");
+        printf("Warning: Page may have been modified since last access. Use at your own discretion!\n");
+        return fetchedHeader;
+    }
+
+    updatedHeader.hostName = fetchedHeader.hostName;
+    updatedHeader.filePath = fetchedHeader.filePath;
+    updatedHeader.lastAccessTime = date;
+    updatedHeader.lastModified = lastModified;
+    updatedHeader.expires = expires;
+    updatedHeader.body = newResponse;
+
+    // Add this new data to cache.
+    cache->add(key, updatedHeader);
+
+    return updatedHeader;
+
+} // handleCache
 
 
 
@@ -316,19 +375,19 @@ int main(int argc, char *argv[])
     struct sockaddr_in serverAddr, clientAddr;
 
     // Some pre-flight checks.
-    if (argc > 2)
+    if (argc > 3)
     {
-        printf("Only 2 arguments allowed! Please try again...\n");
+        printf("Only 3 arguments allowed! Please try again...\n");
         exit(EXIT_FAILURE);
     }
-    else if (argc == 1)
+    else if ((argc == 1) || (argc == 2))
     {
-        printf("Too few arguments! Please enter the port number to connect to.\n");
+        printf("Too few arguments! Please enter the IP address and port number to bind to.\n");
         exit(EXIT_FAILURE);
     }
 
     // Fetch the port as argument.
-    char *portToConnect = argv[1];
+    char *portToConnect = argv[2];
 
     // Create a socket descriptor for an IPV4 address and handling TCP connections.
     serverSocketFd = socket(AF_INET, SOCK_STREAM, 0);
@@ -342,7 +401,8 @@ int main(int argc, char *argv[])
     // Initialize the server struct with the necessary data.
     serverAddr.sin_family = AF_INET;
     serverAddr.sin_port = htons(atoi(portToConnect));
-    serverAddr.sin_addr.s_addr = INADDR_ANY;
+    char *ipToBind = argv[1];
+    serverAddr.sin_addr.s_addr = inet_addr(ipToBind);
 
     // Bind to the socket descriptor created earlier.
     int retVal = bind(serverSocketFd, (struct sockaddr*)&serverAddr, sizeof(serverAddr));
@@ -365,7 +425,7 @@ int main(int argc, char *argv[])
         close(serverSocketFd);
         exit(EXIT_FAILURE);
     }
-    printf("Listening for incoming connections...\n");
+    printf("Listening for incoming connections...\n\n\n");
 
 
     int MaxFd;
@@ -389,7 +449,7 @@ int main(int argc, char *argv[])
         // This is because the file descriptors passed to select is cleared
         // after processing.
         readFds = masterReadFds;
-        printf("MAX File Descriptor is {%d}\n", MaxFd);
+        // printf("MAX File Descriptor is {%d}\n", MaxFd);
 
         int retVal = select(MaxFd + 1, &readFds, NULL, NULL, NULL);
         if (retVal == -1)
@@ -398,7 +458,6 @@ int main(int argc, char *argv[])
                     retVal, strerror(errno));
             exit(EXIT_FAILURE);
         }
-        printf("We got an alert on a monitored descriptor\n");
 
         for (int descriptor = 0; descriptor <= MaxFd; descriptor++)
         {
@@ -407,7 +466,6 @@ int main(int argc, char *argv[])
                 continue;
             }
 
-            printf("We got an alert on descriptor = (%d)\n", descriptor);
             // We have a File descriptor ready for reading.
 
             if (descriptor == serverSocketFd)
@@ -422,7 +480,7 @@ int main(int argc, char *argv[])
                     continue;
                 }
 
-                printf("Successfully established a connection with the client!\n");
+                printf("Successfully established a connection with the client!\n\n");
                 printf("Waiting for data...\n");
 
                 // Add new client FD to the master list.
@@ -459,7 +517,9 @@ int main(int argc, char *argv[])
             if (webSockFd == -1)
             {
                 printf("Failed to connect establish connection to server!\n");
-                exit(EXIT_FAILURE);
+                FD_CLR(descriptor, &masterReadFds);
+                close(descriptor);
+                continue;
             }
 
             printf("Connected to {%s}\n", host.c_str());
@@ -476,20 +536,27 @@ int main(int argc, char *argv[])
             while ((bytesReceived = recv(webSockFd, buffer, sizeof(buffer) - 1, 0)) > 0)
             {
                 buffer[bytesReceived] = '\0';
-                // send data to client
-                send(descriptor, buffer, 4096, 0);
                 responseBuffer += std::string(buffer);
             }
 
-            // Close the connection
+            // Close the connection explicitly.
+            // Anyway the server terminates after it is done
+            // serving the web page.
             close(webSockFd);
 
             std::string date, lastModified, expires;
             parseHTTPresponse(responseBuffer, date, lastModified, expires);
-            // printf("Date: {%s}\n", date.c_str());
-            // printf("Last Modified: {%s}\n", lastModified.c_str());
-            // printf("Expires: {%s}\n", expires.c_str());
 
+            responseBuffer = parseHTTPBody(responseBuffer);
+            if (responseBuffer.empty())
+            {
+                printf("Cannot serve Web Page to the client. Failure to ascertain body of the webpage.\n");
+                FD_CLR(descriptor, &masterReadFds);
+                close(descriptor);
+                continue;
+            }
+
+            // Form the header.
             http::httpHeader header;
             header.hostName = host;
             header.filePath = path;
@@ -498,13 +565,24 @@ int main(int argc, char *argv[])
             header.expires = expires;
             header.body = responseBuffer;
 
-            handleCache(header, cache);
+            http::httpHeader headerToReturn = handleCache(header, cache);
+
+            std::string bufferToSend = headerToReturn.body;
+            if (send(descriptor, bufferToSend.c_str(), bufferToSend.length(), 0) == -1)
+            {
+                printf("Failed to serve Web Page to client!\n");
+            }
+
+            printf("\nDone serving client\n");
+
+            printf("\n-----------------------------------\n");
 
             FD_CLR(descriptor, &masterReadFds);
             close(descriptor);
         }
-
     }
+
+    close(serverSocketFd);
 
     return 0;
 }

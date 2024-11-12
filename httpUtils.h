@@ -9,7 +9,6 @@
 
 namespace http
 {
-
     enum class retDateParse
     {
         SUCCESS = 1,
@@ -44,7 +43,6 @@ namespace http
             LRUCache(size_t _capacity)
             {
                 this->capacity = _capacity;
-                printf("Constructor initialized!\n");
             }
 
             // Method to access an element.
@@ -70,6 +68,7 @@ namespace http
                     // Update value and move item to the front.
                     iterator->second->second = value;
                     cachedList.splice(cachedList.begin(), cachedList, iterator->second);
+                    display();
                     return;
                 }
 
@@ -77,6 +76,7 @@ namespace http
                 // at capacity.
                 if (cachedList.size() == capacity)
                 {
+                    printf("Cache is at capacity! Removing Least Recently Used Element...\n");
                     auto popElement = cachedList.back();
                     cachedMap.erase(popElement.first);
                     cachedList.pop_back();
@@ -84,18 +84,21 @@ namespace http
 
                 cachedList.emplace_front(key, value);
                 cachedMap[key] = cachedList.begin();
+
+                display();
             }
 
             // Mainly for debugging.
             void display(void) const
             {
-                printf("Printing cache\n\n\n");
+                printf("\n\n$$$ Printing cache $$$\n\n");
+                printf("Most Recently Used --> ");
                 for (const auto&element: cachedList)
                 {
-                    std::cout << "{ " << element.first << ": " << element.second.hostName
-                              << " + " << element.second.filePath << "} ";
+                    printf("{%s : Last Accessed = %s} --> ", element.first.c_str(), element.second.lastAccessTime.c_str());
                 }
-                std::cout << std::endl;
+                printf("Least Recently Used");
+                printf("\n\n");
             }
     };
 }
