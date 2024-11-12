@@ -442,7 +442,9 @@ int main(int argc, char *argv[])
 
     char receiveBuf[BUFFER_SIZE];
 
-    http::LRUCache *cache = new http::LRUCache(3);
+    // Set Max capacity of the cache.
+    http::LRUCache *cache = new http::LRUCache(10);
+
     while (true)
     {
         // Take a copy of the master list of file descriptors.
